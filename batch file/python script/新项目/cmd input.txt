@@ -1,0 +1,1 @@
+tesseract.exe zxcv.jpg  zxcv.txt -l jpn

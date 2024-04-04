@@ -1,0 +1,1 @@
+findstr /f:"D:\desktop\LOOMING\Desktop\merge text file\abc.txt" /n .  >> alalalalal.?

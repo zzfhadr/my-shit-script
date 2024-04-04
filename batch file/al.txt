@@ -1,0 +1,32 @@
+AsMonStartupTask64   
+sihost   
+svchost   
+taskhostw   
+taskhostw   
+ASUSPowerScheme   
+ASUSDisplayCtrl   
+ASUS_FRQ_Control   
+ctfmon   
+igfxEM   
+explorer   
+igfxext   
+svchost   
+StartMenuExperienceHost   
+SearchApp   
+RuntimeBroker   
+TextInputHost   
+dllhost   
+smartscreen   
+SecurityHealthSystray   
+Clash for Windows   
+Clash for Windows   
+HControl   
+ShellExperienceHost   
+RuntimeBroker   
+SogouWBImeBroker   
+SogouWBImeLoader   
+RtkAudUService64   
+kgupnp   
+GeneralTPCfg64   
+cmd   
+conhost   

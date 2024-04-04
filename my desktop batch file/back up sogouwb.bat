@@ -1,0 +1,1 @@
+Bandizip.exe c C:\Users\JR\OneDrive\Music\Sogouwb.zip c:\Users\JR\AppData\LocalLow\SogouWB\

@@ -1,0 +1,1 @@
+type *.kt >> allkotlincoede

@@ -1,0 +1,408 @@
+第1章 x86 Course (Part 1: Goals)
+https://www.linkedin.com/pulse/assembly-language-basic-malware-reverse-engineering-kevin-m-thomas/
+第2章 x86 Course (Part 2: Techniques)
+https://www.linkedin.com/pulse/assembly-language-basic-malware-reverse-engineering-kevin-m-thomas-1/
+第3章 x86 Course (Part 3: Types Of Malware)
+https://www.linkedin.com/pulse/assembly-language-basic-malware-reverse-engineering-kevin-m-thomas-2/
+第4章 x86 Course (Part 4: x86 Assembly Intro)
+https://www.linkedin.com/pulse/assembly-language-basic-malware-reverse-engineering-kevin-m-thomas-3/
+第5章 x86 Course (Part 5: Binary Number System)
+https://www.linkedin.com/pulse/assembly-language-basic-malware-reverse-engineering-kevin-m-thomas-4/
+第6章 x86 Course (Part 6: Hexadecimal Number System)
+https://www.linkedin.com/pulse/assembly-language-basic-malware-reverse-engineering-kevin-m-thomas-5/
+第7章 x86 Course (Part 7: Transistors And Memory)
+https://www.linkedin.com/pulse/assembly-language-basic-malware-reverse-engineering-kevin-m-thomas-6/
+第8章 x86 Course (Part 8 - Bytes, Words, Double Words, etc...)
+https://www.linkedin.com/pulse/assembly-language-basic-malware-reverse-engineering-kevin-m-thomas-7/
+第9章 x86 Course (Part 9: x86 Basic Architecture)
+https://www.linkedin.com/pulse/assembly-language-basic-malware-reverse-engineering-kevin-m-thomas-8/
+第10章 x86 Course (Part 10: General-purpose Registers)
+https://www.linkedin.com/pulse/assembly-language-basic-malware-reverse-engineering-kevin-m-thomas-9/
+第11章 x86 Course (Part 11: Segment Registers)
+https://www.linkedin.com/pulse/assembly-language-basic-malware-reverse-engineering-kevin-m-thomas-10/
+第12章 x86 Course (Part 12: Instruction Pointer Register)
+https://www.linkedin.com/pulse/assembly-language-basic-malware-reverse-engineering-kevin-m-thomas-11/
+第13章 x86 Course (Part 13: Control Registers)
+https://www.linkedin.com/pulse/assembly-language-basic-malware-reverse-engineering-kevin-m-thomas-12/
+第14章 x86 Course (Part 14: Flags)
+https://www.linkedin.com/pulse/assembly-language-basic-malware-reverse-engineering-kevin-m-thomas-13/
+第15章 x86 Course (Part 15: Stack)
+https://www.linkedin.com/pulse/assembly-language-basic-malware-reverse-engineering-kevin-m-thomas-14/
+第16章 x86 Course (Part 16: Heap)
+https://www.linkedin.com/pulse/assembly-language-basic-malware-reverse-engineering-kevin-m-thomas-15/
+第17章 x86 Course (Part 17 - How To Install Linux)
+https://www.linkedin.com/pulse/assembly-language-basic-malware-reverse-engineering-kevin-m-thomas-16/
+第18章 x86 Course (Part 18 - vim Text Editor)
+https://www.linkedin.com/pulse/assembly-language-basic-malware-reverse-engineering-kevin-m-thomas-17/
+第19章 x86 Course (Part 19 - Why Learn Assembly)
+https://www.linkedin.com/pulse/assembly-language-basic-malware-reverse-engineering-kevin-m-thomas-18/
+第20章 x86 Course (Part 20 - Instruction Code Handling)
+https://www.linkedin.com/pulse/assembly-language-basic-malware-reverse-engineering-kevin-m-thomas-19/
+第21章 x86 Course (Part 21 - How To Compile A Program)
+https://www.linkedin.com/pulse/assembly-language-basic-malware-reverse-engineering-kevin-m-thomas-6174148486322233344/
+第22章 x86 Course (Part 22 - ASM Program 1 [Moving Immediate Data])
+https://www.linkedin.com/pulse/assembly-language-basic-malware-reverse-engineering-kevin-m-thomas-6176700362704056320/
+第23章 x86 Course (Part 23 - ASM Debugging 1 [Moving Immediate Data])
+https://www.linkedin.com/pulse/assembly-language-basic-malware-reverse-engineering-kevin-m-thomas-6179235028048834560/
+第24章 x86 Course (Part 24 - ASM Hacking 1 [Moving Immediate Data])
+https://www.linkedin.com/pulse/assembly-language-basic-malware-reverse-engineering-kevin-m-thomas-6181749648739282944/
+第25章 x86 Course (Part 25 - ASM Program 2 [Moving Data Between Registers])
+https://www.linkedin.com/pulse/assembly-language-basic-malware-reverse-engineering-kevin-m-thomas-6184290421015871488/
+第26章 x86 Course (Part 26 - ASM Debugging 2 [Moving Data Between Registers])
+https://www.linkedin.com/pulse/assembly-language-basic-malware-reverse-engineering-kevin-m-thomas-6186852494581198848/
+第27章 x86 Course (Part 27 - ASM Hacking 2 [Moving Data Between Registers])
+https://www.linkedin.com/pulse/assembly-language-basic-malware-reverse-engineering-kevin-m-thomas-6189381915728973824/
+第28章 x86 Course (Part 28 - ASM Program 3 [Moving Data Between Memory And Registers])
+https://www.linkedin.com/pulse/assembly-language-basic-malware-reverse-engineering-kevin-m-thomas-6191923581476184064/
+第29章 x86 Course (Part 29 - ASM Debugging 3 [Moving Data Between Memory And Registers])
+https://www.linkedin.com/pulse/assembly-language-basic-malware-reverse-engineering-kevin-m-thomas-6194452403807363072/
+第30章 x86 Course (Part 30 - ASM Hacking 3 [Moving Data Between Memory And Registers])
+https://www.linkedin.com/pulse/assembly-language-basic-malware-reverse-engineering-kevin-m-thomas-6196977244754186240/
+第31章 x86 Course (Part 31 - ASM Program 4 [Moving Data Between Registers And Memory])
+https://www.linkedin.com/pulse/assembly-language-basic-malware-reverse-engineering-kevin-m-thomas-6199521459321217024/
+第32章 x86 Course (Part 32 - ASM Debugging 4 [Moving Data Between Registers And Memory])
+https://www.linkedin.com/pulse/assembly-language-basic-malware-reverse-engineering-kevin-m-thomas-6202084078657769472/
+第33章 x86 Course (Part 33 - ASM Hacking 4 [Moving Data Between Registers And Memory])
+https://www.linkedin.com/pulse/assembly-language-basic-malware-reverse-engineering-kevin-m-thomas-6204613196200845313/
+第34章 x86 Course (Part 34 - ASM Program 5 [Indirect Addressing With Registers])
+https://www.linkedin.com/pulse/assembly-language-basic-malware-reverse-engineering-kevin-m-thomas-6207141090722619392/
+第35章 x86 Course (Part 35 - ASM Debugging 5 [Indirect Addressing With Registers])
+https://www.linkedin.com/pulse/assembly-language-basic-malware-reverse-engineering-kevin-m-thomas-6209671278844997632/
+第36章 x86 Course (Part 36 - ASM Hacking 5 [Indirect Addressing With Registers])
+https://www.linkedin.com/pulse/assembly-language-basic-malware-reverse-engineering-kevin-m-thomas-6212225805402009600/
+第37章 x86 Course (Part 37 - ASM Program 6 [CMOV Instructions])
+https://www.linkedin.com/pulse/assembly-language-basic-malware-reverse-engineering-kevin-m-thomas-6214770773354123264/
+第38章 x86 Course (Part 38 - ASM Debugging 6 [CMOV Instructions])
+https://www.linkedin.com/pulse/assembly-language-basic-malware-reverse-engineering-kevin-m-thomas-6216651661075582976/
+第39章 x86 Course (Part 39 - ASM Hacking 6 [CMOV Instructions])
+https://www.linkedin.com/pulse/assembly-language-basic-malware-reverse-engineering-kevin-m-thomas-6219938772826492928/
+第40章 x86 Course (Part 40 - Conclusion)
+https://www.linkedin.com/pulse/assembly-language-basic-malware-reverse-engineering-kevin-m-thomas-6222371031936434176/
+第41章 ARM-32 Course 1 (Part 1 - The Meaning Of Life)
+https://www.linkedin.com/pulse/arm-assembly-part-1-meaning-life-kevin-m-thomas/
+第42章 ARM-32 Course 1 (Part 2 - Number Systems)
+https://www.linkedin.com/pulse/arm-assembly-part-2-number-systems-kevin-m-thomas/
+第43章 ARM-32 Course 1 (Part 3 - Binary Addition)
+https://www.linkedin.com/pulse/arm-assembly-part-3-binary-addition-kevin-m-thomas/
+第44章 ARM-32 Course 1 (Part 4 - Binary Subtraction)
+https://www.linkedin.com/pulse/arm-assembly-part-4-binary-subtraction-kevin-m-thomas/
+第45章 ARM-32 Course 1 (Part 5 - Word Lengths)
+https://www.linkedin.com/pulse/arm-assembly-part-5-word-lengths-kevin-m-thomas/
+第46章 ARM-32 Course 1 (Part 6 - Registers)
+https://www.linkedin.com/pulse/arm-assembly-part-6-registers-kevin-m-thomas/
+第47章 ARM-32 Course 1 (Part 7 - Program Counter)
+https://www.linkedin.com/pulse/arm-assembly-part-7-program-counter-kevin-m-thomas/
+第48章 ARM-32 Course 1 (Part 8 - CPSR)
+https://www.linkedin.com/pulse/arm-assembly-part-8-cpsr-kevin-m-thomas/
+第49章 ARM-32 Course 1 (Part 9 - Link Register)
+https://www.linkedin.com/pulse/arm-assembly-part-9-link-register-kevin-m-thomas/
+第50章 ARM-32 Course 1 (Part 10 - Stack Pointer)
+https://www.linkedin.com/pulse/arm-assembly-part-10-stack-pointer-kevin-m-thomas/
+第51章 ARM-32 Course 1 (Part 11 - ARM Firmware Boot Procedures)
+https://www.linkedin.com/pulse/arm-assembly-part-11-firmware-boot-procedures-kevin-m-thomas/
+第52章 ARM-32 Course 1 (Part 12 - Von Neumann Architecture)
+https://www.linkedin.com/pulse/arm-assembly-part-12-von-neumann-architecture-kevin-m-thomas/
+第53章 ARM-32 Course 1 (Part 13 - Instruction Pipeline)
+https://www.linkedin.com/pulse/arm-assembly-part-13-instruction-pipeline-kevin-m-thomas/
+第54章 ARM-32 Course 1 (Part 14 - ADD)
+https://www.linkedin.com/pulse/arm-assembly-part-14-add-kevin-m-thomas/
+第55章 ARM-32 Course 1 (Part 15 - Debugging ADD)
+https://www.linkedin.com/pulse/arm-assembly-part-15-debugging-add-kevin-m-thomas/
+第56章 ARM-32 Course 1 (Part 16 - Hacking ADD)
+https://www.linkedin.com/pulse/arm-assembly-part-16-hacking-add-kevin-m-thomas/
+第57章 ARM-32 Course 1 (Part 17 - ADDS)
+https://www.linkedin.com/pulse/arm-assembly-part-17-adds-kevin-m-thomas/
+第58章 ARM-32 Course 1 (Part 18 - Debugging ADDS)
+https://www.linkedin.com/pulse/arm-assembly-part-18-debugging-adds-kevin-m-thomas/
+第59章 ARM-32 Course 1 (Part 19 - Hacking ADDS)
+https://www.linkedin.com/pulse/arm-assembly-part-19-hacking-adds-kevin-m-thomas/
+第60章 ARM-32 Course 1 (Part 20 - ADC)
+https://www.linkedin.com/pulse/arm-assembly-part-20-adc-kevin-m-thomas
+第61章 ARM-32 Course 1 (Part 21 - Debugging ADC)
+https://www.linkedin.com/pulse/arm-assembly-part-21-adc-debugging-kevin-m-thomas
+第62章 ARM-32 Course 1 (Part 22 - Hacking ADC)
+https://www.linkedin.com/pulse/arm-assembly-part-22-adc-hacking-kevin-m-thomas/
+第63章 ARM-32 Course 1 (Part 23 - SUB)
+https://www.linkedin.com/pulse/arm-assembly-part-23-sub-kevin-m-thomas
+第64章 ARM-32 Course 1 (Part 24 - Debugging SUB)
+https://www.linkedin.com/pulse/arm-assembly-part-24-debugging-sub-kevin-m-thomas/
+第65章 ARM-32 Course 1 (Part 25 - Hacking SUB)
+https://www.linkedin.com/pulse/arm-assembly-part-25-hacking-sub-kevin-m-thomas/
+第66章 ARM-32 Course 2 (Part 1 - The Meaning Of Life Part 2)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-1-meaning-life-2-kevin-m-thomas
+第67章 ARM-32 Course 2 (Part 2 - Number Systems)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-2-number-systems-kevin-m-thomas/
+第68章 ARM-32 Course 2 (Part 3 - Binary Addition)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-3-binary-addition-kevin-m-thomas/
+第69章 ARM-32 Course 2 (Part 4 - Binary Subtraction)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-4-binary-subtraction-kevin-m-thomas/
+第70章 ARM-32 Course 2 (Part 5 - Word Lengths)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-5-word-lengths-kevin-m-thomas/
+第71章 ARM-32 Course 2 (Part 6 - Registers)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-6-registers-kevin-m-thomas/
+第72章 ARM-32 Course 2 (Part 7 - Program Counter)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-7-program-counter-kevin-m-thomas/
+第73章 ARM-32 Course 2 (Part 8 - CPSR)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-8-cpsr-kevin-m-thomas/
+第74章 ARM-32 Course 2 (Part 9 - Link Register)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-9-link-register-kevin-m-thomas/
+第75章 ARM-32 Course 2 (Part 10 - Stack Pointer)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-10-stack-pointer-kevin-m-thomas/
+第76章 ARM-32 Course 2 (Part 11 - Firmware Boot Procedures)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-11-firmware-boot-kevin-m-thomas/
+第77章 ARM-32 Course 2 (Part 12 - Von Neumann Architecture)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-12-von-neumann-kevin-m-thomas/
+第78章 ARM-32 Course 2 (Part 13 - Instruction Pipeline)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-13-instruction-pipeline-kevin-m-thomas/
+第79章 ARM-32 Course 2 (Part 14 - Hello World)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-14-hello-world-kevin-m-thomas/
+第80章 ARM-32 Course 2 (Part 15 - Debugging Hello World)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-15-debugging-hello-world-thomas/
+第81章 ARM-32 Course 2 (Part 16 - Hacking Hello World)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-16-hacking-hello-world-kevin-m-thomas/
+第82章 ARM-32 Course 2 (Part 17 - Constants)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-17-constants-kevin-m-thomas/
+第83章 ARM-32 Course 2 (Part 18 - Debugging Constants)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-18-debugging-constants-kevin-m-thomas/
+第84章 ARM-32 Course 2 (Part 19 - Hacking Constants)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-19-hacking-constants-kevin-m-thomas/
+第85章 ARM-32 Course 2 (Part 20 - Character Variables)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-20-character-variables-kevin-m-thomas/
+第86章 ARM-32 Course 2 (Part 21 - Debugging Character Variables)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-21-debugging-character-variables-thomas/
+第87章 ARM-32 Course 2 (Part 22 - Hacking Character Variables)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-22-hacking-character-variables-thomas/
+第88章 ARM-32 Course 2 (Part 23 - Boolean Variables)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-23-boolean-variables-kevin-m-thomas/
+第89章 ARM-32 Course 2 (Part 24 - Debugging Boolean Variables)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-24-debugging-boolean-variables-thomas/
+第90章 ARM-32 Course 2 (Part 25 - Hacking Boolean Variables)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-25-hacking-boolean-variables-thomas/
+第91章 ARM-32 Course 2 (Part 26 - Integer Variables)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-26-integer-variables-kevin-m-thomas/
+第92章 ARM-32 Course 2 (Part 27 - Debugging Integer Variables)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-27-debugging-integer-variables-thomas/
+第93章 ARM-32 Course 2 (Part 28 - Hacking Integer Variables)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-28-hacking-integer-variables-thomas/
+第94章 ARM-32 Course 2 (Part 29 - Float Variables)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-29-float-variables-kevin-m-thomas/
+第95章 ARM-32 Course 2 (Part 30 - Debugging Float Variables)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-30-debugging-float-variables-thomas/
+第96章 ARM-32 Course 2 (Part 31 - Hacking Float Variables)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-30-debugging-float-variables-thomas-1/
+第97章 ARM-32 Course 2 (Part 32 - Double Variables)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-32-double-variables-kevin-m-thomas/
+第98章 ARM-32 Course 2 (Part 33 - Debugging Double Variables)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-33-debugging-double-variables-thomas/
+第99章 ARM-32 Course 2 (Part 34 - Hacking Double Variables)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-34-hacking-double-variables-thomas/
+第100章 ARM-32 Course 2 (Part 35 - SizeOf Operator)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-35-sizeof-operator-kevin-m-thomas/
+第101章 ARM-32 Course 2 (Part 36 - Debugging SizeOf Operator)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-36-debugging-sizeof-operator-thomas/
+第102章 ARM-32 Course 2 (Part 37 - Hacking SizeOf Operator)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-37-hacking-sizeof-operator-thomas/
+第103章 ARM-32 Course 2 (Part 38 - Pre-Increment Operator)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-38-pre-increment-operator-thomas/
+第104章 ARM-32 Course 2 (Part 39 - Debugging Pre-Increment Operator)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-39-debugging-operator-kevin-m-thomas/
+第105章 ARM-32 Course 2 (Part 40 - Hacking Pre-Increment Operator)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-40-hacking-pre-increment-kevin-m-thomas/
+第106章 ARM-32 Course 2 (Part 41 - Post-Increment Operator)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-41-post-increment-operator-thomas/
+第107章 ARM-32 Course 2 (Part 42 - Debugging Post-Increment Operator)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-42-debugging-operator-kevin-m-thomas/
+第108章 ARM-32 Course 2 (Part 43 - Hacking Post-Increment Operator)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-43-hacking-operator-kevin-m-thomas/
+第109章 ARM-32 Course 2 (Part 44 - Pre-Decrement Operator)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-44-pre-decrement-operator-thomas/
+第110章 ARM-32 Course 2 (Part 45 - Debugging Pre-Decrement Operator)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-45-debugging-operator-kevin-m-thomas/
+第111章 ARM-32 Course 2 (Part 46 - Hacking Pre-Decrement Operator)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-46-hacking-pre-decrement-kevin-m-thomas/
+第112章 ARM-32 Course 2 (Part 47 - Post-Decrement Operator)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-47-post-decrement-operator-thomas/
+第113章 ARM-32 Course 2 (Part 48 - Debugging Post-Decrement Operator)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-48-debugging-operator-kevin-m-thomas/
+第114章 ARM-32 Course 2 (Part 49 - Hacking Post-Decrement Operator)
+https://www.linkedin.com/pulse/arm-reverse-engineering-part-49-hacking-operator-kevin-m-thomas/
+第115章 ARM-32 Project (Part 1 - Hacking Hello World)
+https://github.com/mytechnotalent/0x01-ARM-32-Hacking-Hello-World/
+第116章 ARM-32 Project (Part 2 - Hacking Int)
+https://github.com/mytechnotalent/0x02-ARM-32-Hacking-Int/
+第117章 ARM-32 Project (Part 3 - Hacking Float)
+https://github.com/mytechnotalent/0x03-ARM-32-Hacking-Float/
+第118章 ARM-32 Project (Part 4 - Hacking Double)
+https://github.com/mytechnotalent/0x04-ARM-32-Hacking-Double/
+第119章 ARM-32 Project (Part 5 - Hacking Char)
+https://github.com/mytechnotalent/0x05-ARM-32-Hacking_Char/
+第120章 ARM-32 Project (Part 6 - Hacking Char Pointer)
+https://github.com/mytechnotalent/0x06-ARM-32-Hacking-Char-Pointer/
+第121章 x64 Course (Part 1 - The Cyber Revolution)
+https://www.linkedin.com/pulse/x64-reverse-engineering-part-1-cyber-revolution-kevin-m-thomas/
+第122章 x64 Course (Part 2 - Transistors)
+https://www.linkedin.com/pulse/x64-reverse-engineering-part-2-transistors-kevin-m-thomas/
+第123章 x64 Course (Part 3 - Logic Gates)
+https://www.linkedin.com/pulse/x64-reverse-engineering-part-3-logic-gates-kevin-m-thomas/
+第124章 x64 Course (Part 4 - Number Systems)
+https://www.linkedin.com/pulse/x64-reverse-engineering-part-4-number-systems-kevin-m-thomas/
+第125章 x64 Course (Part 5 - Binary Addition)
+https://www.linkedin.com/pulse/x64-reverse-engineering-part-5-binary-addition-kevin-m-thomas/
+第126章 x64 Course (Part 6 - Binary Subtraction)
+https://www.linkedin.com/pulse/x64-reverse-engineering-part-6-binary-subtraction-kevin-m-thomas/
+第127章 x64 Course (Part 7 - Word Lengths)
+https://www.linkedin.com/pulse/x64-reverse-engineering-part-7-word-lengths-kevin-m-thomas/
+第128章 x64 Course (Part 8 - General Architecture)
+https://www.linkedin.com/pulse/x64-reverse-engineering-part-8-general-architecture-kevin-m-thomas/
+第129章 x64 Course (Part 9 - Calling Conventions)
+https://www.linkedin.com/pulse/x64-reverse-engineering-part-9-calling-conventions-kevin-m-thomas/
+第130章 x64 Course (Part 10 - Boolean Instructions)
+https://www.linkedin.com/pulse/x64-reverse-engineering-part-10-boolean-kevin-m-thomas/
+第131章 x64 Course (Part 11 - Pointers)
+https://www.linkedin.com/pulse/x64-reverse-engineering-part-11-pointers-kevin-m-thomas/
+第132章 x64 Course (Part 12 - Load Effective Address)
+https://www.linkedin.com/pulse/x64-reverse-engineering-part-12-load-effective-address-thomas/
+
+第133章 x64 Course (Part 13 - The Data Segment)
+https://www.linkedin.com/pulse/x64-reverse-engineering-part-13-data-segment-kevin-m-thomas/
+第134章 x64 Course (Part 14 - SHL Instruction)
+https://www.linkedin.com/pulse/x64-reverse-engineering-part-14-shl-instruction-kevin-m-thomas/
+第135章 x64 Course (Part 15 - SHR Instruction)
+https://www.linkedin.com/pulse/x64-reverse-engineering-part-15-shr-instruction-kevin-m-thomas/
+第136章 x64 Course (Part 16 - ROL Instruction)
+https://www.linkedin.com/pulse/x64-reverse-engineering-part-16-rol-instruction-kevin-m-thomas/
+第137章 x64 Course (Part 17 - ROR Instruction)
+https://www.linkedin.com/pulse/x64-reverse-engineering-part-17-ror-instruction-kevin-m-thomas/
+第138章 x64 Course (Part 18 - Boot Sector Basics [Part 1])
+https://www.linkedin.com/pulse/x64-reverse-engineering-part-18-boot-sector-basics-1-thomas/
+第139章 x64 Course (Part 19 - Boot Sector Basics [Part 2])
+https://www.linkedin.com/pulse/x64-reverse-engineering-part-18-boot-sector-basics-2-thomas/
+第140章 x64 Course (Part 20 - Boot Sector Basics [Part 3])
+https://www.linkedin.com/pulse/x64-reverse-engineering-part-20-boot-sector-basics-3-thomas/
+第141章 x64 Course (Part 21 - Boot Sector Basics [Part 4])
+https://www.linkedin.com/pulse/x64-reverse-engineering-part-21-boot-sector-basics-4-thomas/
+第142章 x64 Course (Part 22 - Boot Sector Basics [Part 5])
+https://www.linkedin.com/pulse/x64-reverse-engineering-part-22-boot-sector-basics-5-thomas/
+第143章 x64 Course (Part 23 - Boot Sector Basics [Part 6])
+https://www.linkedin.com/pulse/x64-reverse-engineering-part-23-boot-sector-basics-6-thomas/
+第144章 x64 Course (Part 24 - Boot Sector Basics [Part 7])
+https://www.linkedin.com/pulse/x64-reverse-engineering-part-24-boot-sector-basics-7-thomas/
+第145章 x64 Course (Part 25 - Boot Sector Basics [Part 8])
+https://www.linkedin.com/pulse/x64-reverse-engineering-part-25-boot-sector-basics-8-thomas/
+第146章 x64 Course (Part 26 - Boot Sector Basics [Part 9])
+https://www.linkedin.com/pulse/x64-reverse-engineering-part-26-boot-sector-basics-9-thomas/
+第147章 x64 Course (Part 27 - x64 Assembly [Part 1])
+https://www.linkedin.com/pulse/x64-reverse-engineering-part-27-assembly-1-kevin-m-thomas/
+第148章 x64 Course (Part 28 - x64 Assembly [Part 2])
+https://www.linkedin.com/pulse/x64-reverse-engineering-part-28-assembly-2-kevin-m-thomas/
+第149章 x64 Course (Part 29 - x64 Assembly [Part 3])
+https://www.linkedin.com/pulse/x64-reverse-engineering-part-29-assembly-3-kevin-m-thomas/
+第150章 x64 Course (Part 30 - x64 Assembly [Part 4])
+https://www.linkedin.com/pulse/x64-reverse-engineering-part-30-assembly-4-kevin-m-thomas/
+第151章 x64 Course (Part 31 - x64 Assembly [Part 5])
+https://www.linkedin.com/pulse/x64-reverse-engineering-part-31-assembly-5-kevin-m-thomas/
+第152章 x64 Course (Part 32 - x64 Assembly [Part 6])
+https://www.linkedin.com/pulse/x64-reverse-engineering-part-32-assembly-6-kevin-m-thomas/
+第153章 x64 Course (Part 33 - x64 Assembly [Part 7])
+https://www.linkedin.com/pulse/x64-reverse-engineering-part-33-assembly-7-kevin-m-thomas/
+第154章 x64 Course (Part 34 - x64 C++ 1 Code [Part 1])
+https://www.linkedin.com/pulse/x64-reverse-engineering-part-34-c-1-code-kevin-m-thomas/
+第155章 x64 Course (Part 35 - x64 C++ 2 Debug [Part 2])
+https://www.linkedin.com/pulse/x64-reverse-engineering-part-35-c-1-debug-2-kevin-m-thomas/
+第156章 x64 Course (Part 36 - x64 C++ 3 Hacking [Part 3])
+https://www.linkedin.com/pulse/x64-reverse-engineering-part-36-c-1-hacking-3-kevin-m-thomas/
+第157章 x64 Course (Part 37 - x64 C & Genesis Of Life)
+https://www.linkedin.com/pulse/x64-reverse-engineering-part-37-c-genesis-life-kevin-m-thomas/
+第158章 x64 Course (Part 38 - x64 Networking Basics)
+https://www.linkedin.com/pulse/x64-reverse-engineering-part-38-networking-basics-kevin-m-thomas/
+第159章 x64 Course (Part 39 - Why C?)
+https://www.linkedin.com/pulse/x64-reverse-engineering-part-39-why-c-kevin-m-thomas/
+第160章 x64 Course (Part 40 - Hacking Hello World!)
+https://www.linkedin.com/pulse/x64-reverse-engineering-part-40-hacking-hello-world-kevin-m-thomas/
+第161章 x64 Course (Part 41 - Hacking Variables!)
+https://www.linkedin.com/pulse/x64-reverse-engineering-part-41-hacking-variables-kevin-m-thomas/
+第162章 x64 Course (Part 42 - Hacking Branches!)
+https://www.linkedin.com/pulse/x64-reverse-engineering-part-42-hacking-branches-kevin-m-thomas/
+第163章 x64 Course (Part 43 - Hacking Pointers!)
+https://www.linkedin.com/pulse/x64-reverse-engineering-part-43-hacking-pointers-kevin-m-thomas/
+第164章 ARM-64 Course (Part 1 - The Meaning Of Life)
+https://www.linkedin.com/pulse/第-1-hacking-c-arm-64-part-meaning-life-kevin-thomas/
+第165章 ARM-64 Course (Part 2 - Development Setup)
+https://www.linkedin.com/pulse/第-2-hacking-c-arm-64-part-development-setup-kevin-thomas/
+第166章 ARM-64 Course (Part 3 - "Hello World")
+https://www.linkedin.com/pulse/第-2-hacking-c-arm-64-part-hello-world-kevin-thomas/
+第167章 ARM-64 Course (Part 4 - Debugging "Hello World")
+https://www.linkedin.com/pulse/第-4-hacking-c-arm-64-part-debugging-hello-world-kevin-thomas/
+第168章 ARM-64 Course (Part 5 - Hacking "Hello World")
+https://www.linkedin.com/pulse/第-5-hacking-c-arm-64-part-hello-world-kevin-thomas/
+第169章 ARM-64 Course (Part 6 - Basic I/O)
+https://www.linkedin.com/pulse/第-6-hacking-c-arm-64-part-basic-io-kevin-thomas/
+第170章 ARM-64 Course (Part 7 - Debugging Basic I/O)
+https://www.linkedin.com/pulse/第-7-hacking-c-arm-64-part-debugging-basic-io-kevin-thomas/
+第171章 ARM-64 Course (Part 8 - Hacking Basic I/O)
+https://www.linkedin.com/pulse/第-8-hacking-c-arm-64-part-basic-io-kevin-thomas/
+第172章 ARM-64 Course (Part 9 - Character Primitive Datatype)
+https://www.linkedin.com/pulse/第-9-hacking-c-arm-64-part-character-primitive-datatype-thomas/
+第173章 ARM-64 Course (Part 10 - Debugging Character Primitive Datatype)
+https://www.linkedin.com/pulse/第-10-hacking-c-arm-64-part-debugging-character-kevin-thomas/
+第174章 ARM-64 Course (Part 11 - Hacking Character Primitive Datatype)
+https://www.linkedin.com/pulse/第-11-hacking-c-arm-64-part-character-primitive-kevin-thomas/
+第175章 ARM-64 Course (Part 12 - Boolean Primitive Datatype)
+https://www.linkedin.com/pulse/hacking-c-arm-64-part-12-boolean-primitive-datatype-kevin-thomas/
+第176章 ARM-64 Course (Part 13 - Debugging Boolean Primitive Datatype)
+https://www.linkedin.com/pulse/hacking-c-arm-64-part-13-debugging-boolean-primitive-kevin-thomas/
+第177章 ARM-64 Course (Part 14 - Hacking Boolean Primitive Datatype)
+https://www.linkedin.com/pulse/hacking-c-arm-64-part-14-boolean-primitive-datatype-kevin-thomas/
+第178章 ARM-64 Course (Part 15 - Float Primitive Datatype)
+https://www.linkedin.com/pulse/hacking-c-arm-64-part-15-float-primitive-datatype-kevin-thomas/
+第179章 ARM-64 Course (Part 16 - Debugging Float Primitive Datatype)
+https://www.linkedin.com/pulse/hacking-c-arm-64-part-16-debugging-float-primitive-datatype-thomas/
+第180章 ARM-64 Course (Part 17 - Hacking Float Primitive Datatype)
+https://www.linkedin.com/pulse/hacking-c-arm-64-part-17-float-primitive-datatype-kevin-thomas/
+第181章 ARM-64 Course (Part 18 - Double Primitive Datatype)
+https://www.linkedin.com/pulse/hacking-c-arm-64-part-18-double-primitive-datatype-kevin-thomas/
+第182章 ARM-64 Course (Part 19 - Debugging Double Primitive Datatype)
+https://www.linkedin.com/pulse/hacking-c-arm-64-part-19-debugging-double-primitive-kevin-thomas/
+第183章 ARM-64 Course (Part 20 - Hacking Double Primitive Datatype)
+https://www.linkedin.com/pulse/hacking-c-arm-64-part-20-double-primitive-datatype-kevin-thomas/
+第184章 Pico Hacking Course (Part 1 - The Why, The How...)
+https://www.linkedin.com/pulse/pico-hacking-part-1-why-how-kevin-thomas/
+第185章 Pico Hacking Course (Part 2 - Hello World)
+https://www.linkedin.com/pulse/pico-hacking-part-2-hello-world-kevin-thomas/
+第186章 Pico Hacking Course (Part 3 - Debugging Hello World)
+https://www.linkedin.com/pulse/pico-hacking-part-3-debugging-hello-world-kevin-thomas/
+第187章 Pico Hacking Course (Part 4 - Hacking Hello World)
+https://www.linkedin.com/pulse/pico-hacking-part-4-hello-world-kevin-thomas
+第188章 Pico Hacking Course (Part 5 - char)
+https://www.linkedin.com/pulse/pico-hacking-part-4-char-kevin-thomas/
+第189章 Pico Hacking Course (Part 6 - Debugging char)
+https://www.linkedin.com/pulse/pico-hacking-part-6-debugging-char-kevin-thomas/
+第190章 Pico Hacking Course (Part 7 - Hacking char)
+https://www.linkedin.com/pulse/pico-hacking-part-7-char-kevin-thomas/
+第191章 Pico Hacking Course (Part 8 - int)
+https://www.linkedin.com/pulse/pico-hacking-part-8-int-kevin-thomas/
+第192章 Pico Hacking Course (Part 9 - Debugging int)
+https://www.linkedin.com/pulse/pico-hacking-part-9-debugging-int-kevin-thomas/
+第193章 Pico Hacking Course (Part 10 - Hacking int)
+https://www.linkedin.com/pulse/pico-hacking-part-10-int-kevin-thomas/
+第194章 Pico Hacking Course (Part 11 - float)
+https://www.linkedin.com/pulse/pico-hacking-part-11-float-kevin-thomas/
+第195章 Pico Hacking Course (Part 12 - Debugging float)
+https://www.linkedin.com/pulse/pico-hacking-part-12-debugging-float-kevin-thomas/
+第196章 Pico Hacking Course (Part 13 - Hacking float)
+https://www.linkedin.com/pulse/pico-hacking-part-13-float-kevin-thomas/
+第197章 Pico Hacking Course (Part 14 - double)
+https://www.linkedin.com/pulse/pico-hacking-part-14-double-kevin-thomas/
+第198章 Pico Hacking Course (Part 15 - Debugging double)
+https://www.linkedin.com/pulse/pico-hacking-part-15-debugging-double-kevin-thomas/
+第199章 Pico Hacking Course (Part 16 - Hacking double)
+https://www.linkedin.com/pulse/pico-hacking-part-16-double-kevin-thomas/
+第200章 Pico Hacking Course (Part 17 - "ABSOLUTE POWER CORRUPTS ABSOLUTELY!", The Tragic Tale Of Input...)
+https://www.linkedin.com/pulse/pico-hacking-part-17-absolute-power-corrupts-tragic-kevin-thomas/
+第201章 Pico Hacking Course (Part 18 - "FOR 800 YEARS HAVE I TRAINED JEDI!", The FORCE That IS Input...)
+https://www.linkedin.com/pulse/pico-hacking-part-18-800-years-have-i-trained-jedi-force-thomas/
+第202章 Pico Hacking Course (Part 19 - Input)
+https://www.linkedin.com/pulse/pico-hacking-part-19-input-kevin-thomas/
+第203章 Pico Hacking Course (Part 20 - Debugging Input)
+https://www.linkedin.com/pulse/pico-hacking-part-20-debugging-input-kevin-thomas/
+

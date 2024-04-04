@@ -1,0 +1,2541 @@
+package com.huanchengfly.tieba.post.activities;
+
+import android.content.Intent;
+import android.net.Uri;
+import android.os.Bundle;
+import android.view.View;
+import android.widget.Button;
+import android.widget.RelativeLayout;
+import android.widget.TextView;
+
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.widget.Toolbar;
+
+import com.huanchengfly.tieba.post.ui.about.AboutPage;
+import com.huanchengfly.tieba.post.ui.theme.utils.ThemeUtils;
+import com.huanchengfly.tieba.post.api.LiteApi;
+import com.huanchengfly.tieba.post.api.interfaces.CommonAPICallback;
+import com.huanchengfly.tieba.post.api.models.NewUpdateBean;
+import com.huanchengfly.tieba.post.R;
+import com.huanchengfly.tieba.post.utils.NavigationHelper;
+import com.huanchengfly.tieba.post.utils.ThemeUtil;
+import com.huanchengfly.tieba.post.utils.VersionUtil;
+
+import butterknife.BindView;
+import butterknife.ButterKnife;
+import butterknife.OnClick;
+import butterknife.Unbinder;
+
+public class AboutActivity extends BaseActivity implements View.OnClickListener {
+    public static final int STATE_ERROR = 0;
+    public static final int STATE_NO_UPDATE = 1;
+    public static final int STATE_UPDATE = 2;
+    private View updateTip;
+    private TextView updateTipHeaderTv;
+    private TextView updateTipTitleTv;
+    private TextView updateTipContentTv;
+    private Button dismissBtn;
+    private Button downloadBtn;
+
+    private int updateState;
+    private NewUpdateBean.ResultBean resultBean;
+    private NavigationHelper navigationHelper;
+
+    @Override
+    protected int getLayoutId() {
+        return R.layout.activity_about;
+    }
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        ThemeUtil.setTranslucentThemeBackground(findViewById(R.id.background));
+        Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+        RelativeLayout mainView = (RelativeLayout) findViewById(R.id.main);
+        View headerView = View.inflate(this, R.layout.header_about, null);
+        updateTip = headerView.findViewById(R.id.header_update_tip_shadow);
+        updateTipHeaderTv = headerView.findViewById(R.id.header_update_tip_header_title);
+        updateTipTitleTv = headerView.findViewById(R.id.header_update_tip_title);
+        updateTipContentTv = headerView.findViewById(R.id.header_update_tip_content);
+        dismissBtn = headerView.findViewById(R.id.header_update_tip_button_dismiss);
+        downloadBtn = headerView.findViewById(R.id.header_update_tip_button_download);
+        navigationHelper = NavigationHelper.newInstance(this);
+        downloadBtn.setOnClickListener(this);
+        dismissBtn.setOnClickListener(this);
+        setSupportActionBar(toolbar);
+        ActionBar actionBar = getSupportActionBar();
+        if (actionBar != null) {
+            actionBar.setTitle(R.string.title_about);
+            actionBar.setDisplayHomeAsUpEnabled(true);
+        }
+        int colorIcon = ThemeUtils.getColorByAttr(this, R.attr.colorAccent);
+        new AboutPage(this)
+                .setHeaderView(headerView)
+                .addTitle("应用信息", colorIcon)
+                .addItem(new AboutPage.Item("当前版本", VersionUtil.getVersionName(this), R.drawable.ic_round_info, colorIcon))
+                .addItem(new AboutPage.Item("源代码").setIcon(R.drawable.ic_codepen, colorIcon).setOnClickListener(v -> navigationHelper.navigationByData(NavigationHelper.ACTION_URL, "https://github.com/HuanCheng65/TiebaLite")))
+                .into(mainView);
+        checkUpdate();
+    }
+
+    /*
+    private void openJoinGroupDialog() {
+        if (groupInfoList == null) {
+            return;
+        }
+        List<String> names = new ArrayList<>();
+        List<UpdateInfoBean.GroupInfo> groupInfos = new ArrayList<>();
+        for (UpdateInfoBean.GroupInfo groupInfo : groupInfoList) {
+            if (groupInfo.isEnabled()) {
+                groupInfos.add(groupInfo);
+                names.add(groupInfo.getType() + " " + groupInfo.getName());
+            }
+        }
+        DialogUtil.build(AboutActivity.this)
+                .setTitle(R.string.title_join_group)
+                .setItems(names.toArray(new String[0]), (dialog, which) -> {
+                    if (TextUtils.isEmpty(groupInfos.get(which).getQGroupKey()) || !joinQQGroup(groupInfos.get(which).getQGroupKey())) {
+                        navigationHelper.navigationByData(NavigationHelper.ACTION_URL, groupInfos.get(which).getLink());
+                    }
+                })
+                .show();
+    }
+    private void loadGroups() {
+        UpdateInfoBean cache = CacheUtil.getCache(this, CACHE_ID_QQ_GROUP, UpdateInfoBean.class);
+        if (cache != null) {
+            groupInfoList = cache.getGroups();
+            if (TextUtils.equals(EXTRA_ACTION_JOIN_GROUP, action)) {
+                openJoinGroupDialog();
+                actionExecuted = true;
+            }
+        }
+        LiteApi.getInstance().updateInfo(new CommonAPICallback<UpdateInfoBean>() {
+            @Override
+            public void onSuccess(UpdateInfoBean data) {
+                CacheUtil.putCache(AboutActivity.this, CACHE_ID_QQ_GROUP, data);
+                groupInfoList = data.getGroups();
+                if (!actionExecuted && TextUtils.equals(EXTRA_ACTION_JOIN_GROUP, action)) {
+                    openJoinGroupDialog();
+                }
+                for (UpdateInfoBean.SupportmentBean supportmentBean : data.getSupportment()) {
+                    AboutPage.Item item = new AboutPage.Item(supportmentBean.getTitle(), supportmentBean.getSubtitle());
+                    if (supportmentBean.getIcon() != null) {
+                        if (supportmentBean.getIcon().getType() == UpdateInfoBean.SupportmentBean.IconBean.TYPE_RESOURCE) {
+                            item.setIcon(getResources().getIdentifier(supportmentBean.getIcon().getId(), "drawable", BaseApplication._getPackageName()));
+                        } else if (supportmentBean.getIcon().getType() == UpdateInfoBean.SupportmentBean.IconBean.TYPE_IMAGE) {
+                            item.setIcon(supportmentBean.getIcon().getUrl());
+                        }
+                    }
+                    if (supportmentBean.getAction() != null) {
+                        item.setOnClickListener(v -> {
+                            FlurryAgent.logEvent("clicked" + supportmentBean.getId());
+                            if (supportmentBean.getAction().getType() == UpdateInfoBean.SupportmentBean.ActionBean.TYPE_LINK) {
+                                navigationHelper.navigationByData(NavigationHelper.ACTION_URL, supportmentBean.getAction().getUrl());
+                            } else if (supportmentBean.getAction().getType() == UpdateInfoBean.SupportmentBean.ActionBean.TYPE_IMAGE) {
+                                PhotoViewActivity.launch(AboutActivity.this, new PhotoViewBean(supportmentBean.getAction().getUrl(), true));
+                            }
+                        });
+                    }
+                    if (supportmentBean.getExpireTime() > System.currentTimeMillis()) {
+                        mAboutPage.addItem(item);
+                    }
+                }
+                mAboutPage.notifyDataSetChanged();
+            }
+
+            @Override
+            public void onFailure(int code, String error) {
+            }
+        });
+    }
+    */
+
+    private void checkUpdate() {
+        LiteApi.getInstance().newCheckUpdate(new CommonAPICallback<NewUpdateBean>() {
+            @Override
+            public void onSuccess(NewUpdateBean data) {
+                if (data.isHasUpdate()) {
+                    resultBean = data.getResult();
+                    updateState = STATE_UPDATE;
+                } else {
+                    resultBean = null;
+                    updateState = STATE_NO_UPDATE;
+                }
+                refreshUpdateTip();
+            }
+
+            @Override
+            public void onFailure(int code, String error) {
+                resultBean = null;
+                updateState = STATE_ERROR;
+                refreshUpdateTip();
+            }
+        });
+    }
+
+    private void refreshUpdateTip() {
+        switch (updateState) {
+            case STATE_NO_UPDATE:
+                downloadBtn.setText(R.string.button_check_update);
+                updateTip.setVisibility(View.VISIBLE);
+                dismissBtn.setVisibility(View.GONE);
+                updateTipHeaderTv.setText(getString(R.string.update_tip_no_header));
+                updateTipTitleTv.setText(getString(R.string.update_tip_no_title));
+                updateTipContentTv.setText(getString(R.string.update_tip_no_content));
+                break;
+            case STATE_UPDATE:
+                if (resultBean != null) {
+                    downloadBtn.setText(R.string.button_go_to_download);
+                    updateTip.setVisibility(View.VISIBLE);
+                    boolean cancelable = resultBean.isCancelable();
+                    updateTipHeaderTv.setText(getString(R.string.update_tip_header, resultBean.getVersionType() == 0 ? getString(R.string.tip_release_version) : getString(R.string.tip_version_beta)));
+                    updateTipTitleTv.setText(getString(R.string.update_tip_title, resultBean.getVersionName(), String.valueOf(resultBean.getVersionCode())));
+                    StringBuilder stringBuilder = new StringBuilder();
+                    for (String content : resultBean.getUpdateContent()) {
+                        stringBuilder.append(content);
+                        stringBuilder.append("\n");
+                    }
+                    updateTipContentTv.setText(stringBuilder);
+                    dismissBtn.setVisibility(cancelable ? View.VISIBLE : View.GONE);
+                    break;
+                }
+            default:
+                updateTip.setVisibility(View.GONE);
+                break;
+        }
+    }
+
+    @Override
+    public void onClick(View v) {
+        switch (v.getId()) {
+            case R.id.header_update_tip_button_download:
+                if (resultBean == null) {
+                    if (updateState != STATE_NO_UPDATE) {
+                        checkUpdate();
+                    }
+                    return;
+                }
+                VersionUtil.showDownloadDialog(this, resultBean);
+                break;
+            case R.id.header_update_tip_button_dismiss:
+                resultBean = null;
+                refreshUpdateTip();
+                break;
+        }
+    }
+
+    public boolean joinQQGroup(String key) {
+        Intent intent = new Intent();
+        intent.setData(Uri.parse("mqqopensdkapi://bizAgent/qm/qr?url=http%3A%2F%2Fqm.qq.com%2Fcgi-bin%2Fqm%2Fqr%3Ffrom%3Dapp%26p%3Dandroid%26k%3D" + key));
+        // 此Flag可根据具体产品需要自定义，如设置，则在加群界面按返回，返回手Q主界面，不设置，按返回会返回到呼起产品界面
+        // intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        try {
+            startActivity(intent);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+}package com.huanchengfly.tieba.post.activities;
+
+import android.animation.ObjectAnimator;
+import android.animation.ValueAnimator;
+import android.app.Activity;
+import android.app.Dialog;
+import android.content.res.ColorStateList;
+import android.graphics.Color;
+import android.os.Bundle;
+import android.text.TextUtils;
+import android.util.DisplayMetrics;
+import android.view.Menu;
+import android.view.MenuItem;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.animation.AccelerateDecelerateInterpolator;
+import android.widget.ImageView;
+import android.widget.TextView;
+
+import androidx.annotation.CallSuper;
+import androidx.annotation.ColorInt;
+import androidx.annotation.Keep;
+import androidx.annotation.Nullable;
+import androidx.appcompat.widget.Toolbar;
+
+import com.gyf.immersionbar.ImmersionBar;
+import com.huanchengfly.tieba.post.ui.theme.interfaces.ExtraRefreshable;
+import com.huanchengfly.tieba.post.ui.theme.utils.ThemeUtils;
+import com.huanchengfly.tieba.post.R;
+import com.huanchengfly.tieba.post.BaseApplication;
+import com.huanchengfly.tieba.post.utils.AppPreferencesUtils;
+import com.huanchengfly.tieba.post.utils.HandleBackUtil;
+import com.huanchengfly.tieba.post.utils.SharedPreferencesUtil;
+import com.huanchengfly.tieba.post.utils.ThemeUtil;
+import com.huanchengfly.tieba.post.widgets.VoicePlayerView;
+import com.huanchengfly.tieba.post.widgets.theme.TintToolbar;
+
+import butterknife.ButterKnife;
+import cn.jzvd.Jzvd;
+import me.imid.swipebacklayout.lib.app.SwipeBackActivity;
+
+import static com.huanchengfly.tieba.post.utils.ThemeUtil.SP_CUSTOM_TOOLBAR_PRIMARY_COLOR;
+import static com.huanchengfly.tieba.post.utils.ThemeUtil.THEME_CUSTOM;
+import static com.huanchengfly.tieba.post.utils.ThemeUtil.THEME_TRANSLUCENT;
+import static com.huanchengfly.tieba.post.utils.ColorUtils.getDarkerColor;
+
+public abstract class BaseActivity extends SwipeBackActivity implements ExtraRefreshable {
+    public static final int NO_LAYOUT = -1;
+    private TintToolbar mTintToolbar;
+    private String oldTheme;
+    private boolean activityRunning = true;
+
+    protected int getLayoutId() {
+        return NO_LAYOUT;
+    }
+
+    protected AppPreferencesUtils getAppPreferences() {
+        return new AppPreferencesUtils(this);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        activityRunning = false;
+        Jzvd.releaseAllVideos();
+    }
+
+    protected boolean showDialog(Dialog dialog) {
+        if (isActivityRunning()) {
+            dialog.show();
+            return true;
+        }
+        return false;
+    }
+
+    public boolean isActivityRunning() {
+        return activityRunning;
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        VoicePlayerView.Manager.release();
+    }
+
+    public boolean isNeedImmersionBar() {
+        return true;
+    }
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        fixBackground();
+        getDeviceDensity();
+        BaseApplication.getInstance().addActivity(this);
+        ThemeUtil.setTheme(this);
+        oldTheme = ThemeUtil.getTheme(this);
+        if (isNeedImmersionBar()) {
+            refreshStatusBarColor();
+        }
+        if (getLayoutId() != NO_LAYOUT) {
+            setContentView(getLayoutId());
+            ButterKnife.bind(this);
+        }
+    }
+
+    private void fixBackground() {
+        ViewGroup decor = (ViewGroup) getWindow().getDecorView();
+        ViewGroup decorChild = (ViewGroup) decor.getChildAt(0);
+        decorChild.setBackgroundColor(Color.BLACK);
+    }
+
+    public void refreshUIIfNeed() {
+        if (TextUtils.equals(oldTheme, ThemeUtil.getTheme(this)) &&
+                !THEME_CUSTOM.equals(ThemeUtil.getTheme(this)) &&
+                !THEME_TRANSLUCENT.equals(ThemeUtil.getTheme(this))) {
+            return;
+        }
+        if (recreateIfNeed()) {
+            return;
+        }
+        ThemeUtils.refreshUI(this, this);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        activityRunning = true;
+        refreshUIIfNeed();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        BaseApplication.getInstance().removeActivity(this);
+    }
+
+    public void exitApplication() {
+        BaseApplication.getInstance().removeAllActivity();
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch (item.getItemId()) {
+            case android.R.id.home:
+                if (!HandleBackUtil.handleBackPress(this)) {
+                    finish();
+                }
+                return true;
+            case R.id.menu_exit:
+                finish();
+                return true;
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        if (mTintToolbar != null) {
+            mTintToolbar.tint();
+        }
+        return true;
+    }
+
+    @Override
+    public boolean onPrepareOptionsMenu(Menu menu) {
+        if (mTintToolbar != null) {
+            mTintToolbar.tint();
+        }
+        return true;
+    }
+
+    @Override
+    public void setSupportActionBar(@Nullable Toolbar toolbar) {
+        super.setSupportActionBar(toolbar);
+        if (toolbar instanceof TintToolbar) {
+            mTintToolbar = (TintToolbar) toolbar;
+        }
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (!HandleBackUtil.handleBackPress(this)) {
+            super.onBackPressed();
+        }
+    }
+
+    public void setTitle(String newTitle) {
+    }
+
+    public void setSubTitle(String newTitle) {
+    }
+
+    protected void getDeviceDensity() {
+        DisplayMetrics metrics = new DisplayMetrics();
+        getWindowManager().getDefaultDisplay().getMetrics(metrics);
+        int width = metrics.widthPixels;
+        int height = metrics.heightPixels;
+        BaseApplication.ScreenInfo.EXACT_SCREEN_HEIGHT = height;
+        BaseApplication.ScreenInfo.EXACT_SCREEN_WIDTH = width;
+        float density = metrics.density;
+        BaseApplication.ScreenInfo.DENSITY = metrics.density;
+        BaseApplication.ScreenInfo.SCREEN_HEIGHT = (int) (height / density);
+        BaseApplication.ScreenInfo.SCREEN_WIDTH = (int) (width / density);
+    }
+
+    protected ValueAnimator colorAnim(ImageView view, int... value) {
+        ValueAnimator animator = ObjectAnimator.ofArgb(new ImageViewAnimWrapper(view), "tint", value);
+        animator.setDuration(150);
+        animator.setInterpolator(new AccelerateDecelerateInterpolator());
+        return animator;
+    }
+
+    protected ValueAnimator colorAnim(TextView view, int... value) {
+        ValueAnimator animator = ObjectAnimator.ofArgb(new TextViewAnimWrapper(view), "textColor", value);
+        animator.setDuration(150);
+        animator.setInterpolator(new AccelerateDecelerateInterpolator());
+        return animator;
+    }
+
+    public void refreshStatusBarColor() {
+        if (THEME_TRANSLUCENT.equals(ThemeUtil.getTheme(this))) {
+            ImmersionBar.with(this)
+                    .transparentBar()
+                    .init();
+        } else {
+            ImmersionBar.with(this)
+                    .fitsSystemWindowsInt(true, ThemeUtils.getColorByAttr(this, R.attr.colorBg))
+                    .navigationBarColorInt(ThemeUtils.getColorByAttr(this, R.attr.colorNavBar))
+                    .navigationBarDarkIcon(ThemeUtil.isNavigationBarFontDark(this))
+                    .statusBarDarkFont(ThemeUtil.isStatusBarFontDark(this))
+                    .statusBarColorInt(calcStatusBarColor(ThemeUtils.getColorByAttr(this, R.attr.colorToolbar)))
+                    .init();
+        }
+    }
+
+    protected int calcStatusBarColor() {
+        return calcStatusBarColor(ThemeUtils.getColorByAttr(this, R.attr.colorToolbar));
+    }
+
+    protected int calcStatusBarColor(@ColorInt int originColor) {
+        boolean darkerStatusBar = true;
+        if (THEME_CUSTOM.equals(ThemeUtil.getTheme(this)) && !SharedPreferencesUtil.get(this, SharedPreferencesUtil.SP_SETTINGS)
+                .getBoolean(SP_CUSTOM_TOOLBAR_PRIMARY_COLOR, true)) {
+            darkerStatusBar = false;
+        } else if (ThemeUtil.getTheme(this).equals(ThemeUtil.THEME_WHITE)) {
+            darkerStatusBar = false;
+        } else if (!SharedPreferencesUtil.get(this, SharedPreferencesUtil.SP_SETTINGS).getBoolean("status_bar_darker", true)) {
+            darkerStatusBar = false;
+        }
+        return darkerStatusBar ? getDarkerColor(originColor) : originColor;
+    }
+
+    @CallSuper
+    @Override
+    public void refreshGlobal(Activity activity) {
+        if (isNeedImmersionBar()) {
+            refreshStatusBarColor();
+        }
+        oldTheme = ThemeUtil.getTheme(this);
+    }
+
+    private boolean recreateIfNeed() {
+        if ((ThemeUtil.isNightMode(this) && !ThemeUtil.isNightMode(oldTheme)) ||
+                (!ThemeUtil.isNightMode(this) && ThemeUtil.isNightMode(oldTheme))) {
+            recreate();
+            return true;
+        }
+        if ((oldTheme.equals(THEME_TRANSLUCENT) && !THEME_TRANSLUCENT.equals(ThemeUtil.getTheme(this))) ||
+                (THEME_TRANSLUCENT.equals(ThemeUtil.getTheme(this)) && !oldTheme.equals(THEME_TRANSLUCENT))) {
+            recreate();
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public void refreshSpecificView(View view) {
+    }
+
+    @Keep
+    protected static class TextViewAnimWrapper {
+        private TextView mTarget;
+
+        public TextViewAnimWrapper(TextView view) {
+            mTarget = view;
+        }
+
+        @ColorInt
+        public int getTextColor() {
+            return mTarget.getCurrentTextColor();
+        }
+
+        public void setTextColor(@ColorInt int color) {
+            mTarget.setTextColor(color);
+        }
+    }
+
+    @Keep
+    protected static class ImageViewAnimWrapper {
+        private ImageView mTarget;
+
+        public ImageViewAnimWrapper(ImageView view) {
+            mTarget = view;
+        }
+
+        public int getTint() {
+            return mTarget.getImageTintList() != null ? mTarget.getImageTintList().getDefaultColor() : 0x00000000;
+        }
+
+        public void setTint(@ColorInt int color) {
+            mTarget.setImageTintList(ColorStateList.valueOf(color));
+        }
+    }
+}package com.huanchengfly.tieba.post.activities;
+
+import android.content.Intent;
+import android.graphics.Color;
+import android.os.Bundle;
+import android.view.Menu;
+import android.view.MenuItem;
+
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.widget.Toolbar;
+import androidx.recyclerview.widget.ItemTouchHelper;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+
+import com.google.android.material.appbar.AppBarLayout;
+import com.google.android.material.snackbar.Snackbar;
+import com.huanchengfly.tieba.post.R;
+import com.huanchengfly.tieba.post.adapters.BlockListAdapter;
+import com.huanchengfly.tieba.post.components.dialogs.EditTextDialog;
+import com.huanchengfly.tieba.post.models.database.Block;
+import com.huanchengfly.tieba.post.utils.ThemeUtil;
+import com.huanchengfly.tieba.post.utils.Util;
+import com.huanchengfly.tieba.post.utils.GsonUtil;
+
+public class BlockListActivity extends BaseActivity {
+    private Toolbar toolbar;
+    private AppBarLayout toolbarContainer;
+    private RecyclerView recyclerView;
+    private LinearLayoutManager layoutManager;
+    private BlockListAdapter blockListAdapter;
+    private EditTextDialog editTextDialog;
+    private int type;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_block_list);
+        ThemeUtil.setTranslucentThemeBackground(findViewById(R.id.background));
+        toolbar = (Toolbar) findViewById(R.id.toolbar);
+        toolbarContainer = (AppBarLayout) findViewById(R.id.appbar);
+        recyclerView = (RecyclerView) findViewById(R.id.block_list_recycler_view);
+        Intent intent = getIntent();
+        this.type = intent.getIntExtra("category", Block.CATEGORY_BLACK_LIST);
+        setSupportActionBar(toolbar);
+        ActionBar actionBar = getSupportActionBar();
+        if (actionBar != null) {
+            actionBar.setDisplayHomeAsUpEnabled(true);
+        }
+        if (this.type == Block.CATEGORY_BLACK_LIST) {
+            if (actionBar != null) {
+                actionBar.setTitle(R.string.title_black_list);
+            }
+        } else if (this.type == Block.CATEGORY_WHITE_LIST) {
+            if (actionBar != null) {
+                actionBar.setTitle(R.string.title_white_list);
+            }
+        } else {
+            finish();
+            return;
+        }
+        layoutManager = new LinearLayoutManager(this);
+        ItemTouchHelper mItemTouchHelper = new ItemTouchHelper(new ItemTouchHelper.Callback() {
+            @Override
+            public void clearView(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder) {
+                super.clearView(recyclerView, viewHolder);
+                viewHolder.itemView.setBackgroundColor(Color.TRANSPARENT);
+            }
+
+            @Override
+            public void onSelectedChanged(RecyclerView.ViewHolder viewHolder, int actionState) {
+                super.onSelectedChanged(viewHolder, actionState);
+                if (actionState == ItemTouchHelper.ACTION_STATE_SWIPE) {
+                    viewHolder.itemView.setBackgroundColor(Util.getColorByAttr(BlockListActivity.this, R.attr.colorControlHighlight, R.color.transparent));
+                }
+            }
+
+            @Override
+            public int getMovementFlags(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder) {
+                int dragFlags = 0, swiped = ItemTouchHelper.RIGHT | ItemTouchHelper.LEFT;
+                return makeMovementFlags(dragFlags, swiped);
+            }
+
+            @Override
+            public boolean onMove(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder, @NonNull RecyclerView.ViewHolder target) {
+                return true;
+            }
+
+            @Override
+            public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
+                int position = viewHolder.getAdapterPosition();
+                Block block = blockListAdapter.get(position);
+                blockListAdapter.remove(position);
+                Util.createSnackbar(recyclerView, R.string.toast_deleted, Snackbar.LENGTH_LONG)
+                        .addCallback(new Snackbar.Callback() {
+                            @Override
+                            public void onDismissed(Snackbar snackbar, int event) {
+                                if (event != DISMISS_EVENT_ACTION) {
+                                    block.delete();
+                                    blockListAdapter.refresh();
+                                }
+                            }
+                        }).setAction(R.string.button_undo, mView -> blockListAdapter.insert(block, position)).show();
+            }
+        });
+        mItemTouchHelper.attachToRecyclerView(recyclerView);
+        recyclerView.setLayoutManager(layoutManager);
+        blockListAdapter = new BlockListAdapter(this, this.type);
+        recyclerView.setAdapter(blockListAdapter);
+        blockListAdapter.refresh();
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.menu_block_list_toolbar, menu);
+        return super.onCreateOptionsMenu(menu);
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch (item.getItemId()) {
+            case R.id.menu_add:
+                editTextDialog = new EditTextDialog(this)
+                        .setTipText(R.string.tip_input)
+                        .setHelperText(R.string.tip_multi_block);
+                if (this.type == Block.CATEGORY_BLACK_LIST)
+                    editTextDialog.setTitle(R.string.title_add_black);
+                else if (this.type == Block.CATEGORY_WHITE_LIST)
+                    editTextDialog.setTitle(R.string.title_add_white);
+                editTextDialog.setOnSubmitListener((String content) -> {
+                    String[] strings = new String[]{content};
+                    if (content.contains(" ")) {
+                        strings = content.split(" ");
+                    }
+                    new Block()
+                            .setKeywords(GsonUtil.getGson().toJson(strings))
+                            .setType(Block.TYPE_KEYWORD)
+                            .setCategory(this.type)
+                            .save();
+                    blockListAdapter.refresh();
+                }).show();
+                break;
+            default:
+                break;
+        }
+        return super.onOptionsItemSelected(item);
+    }
+}
+package com.huanchengfly.tieba.post.activities;
+
+import android.net.Uri;
+import android.os.Bundle;
+
+import androidx.appcompat.app.AppCompatActivity;
+
+import com.huanchengfly.tieba.post.utils.NavigationHelper;
+
+import java.util.HashMap;
+import java.util.Map;
+
+public class DispatchActivity extends AppCompatActivity {
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        Uri uri = getIntent().getData();
+        NavigationHelper navigationHelper = NavigationHelper.newInstance(this);
+        if (uri != null) {
+            String url = uri.toString();
+            Uri newUri = Uri.parse(url.replace("://tieba.baidu.com//", "://tieba.baidu.com/?"));
+            if ("http".equalsIgnoreCase(newUri.getScheme()) || "https".equalsIgnoreCase(newUri.getScheme())) {
+                navigationHelper.navigationByData(NavigationHelper.ACTION_URL, newUri.toString());
+            } else if (newUri.getScheme().equals("tbfrs")) {
+                navigationHelper.navigationByData(NavigationHelper.ACTION_FORUM, newUri.getQueryParameter("kw"));
+            } else if (newUri.getScheme().equals("tbpb")) {
+                Map<String, String> map = new HashMap<>();
+                map.put("tid", newUri.getQueryParameter("tid"));
+                navigationHelper.navigationByData(NavigationHelper.ACTION_THREAD, map);
+            } else if (newUri.getScheme().equals("com.baidu.tieba") && "unidispatch".equals(newUri.getHost())) {
+                if ("/frs".equals(newUri.getPath())) {
+                    navigationHelper.navigationByData(NavigationHelper.ACTION_FORUM, newUri.getQueryParameter("kw"));
+                } else if ("/pb".equals(newUri.getPath())) {
+                    Map<String, String> map = new HashMap<>();
+                    map.put("tid", newUri.getQueryParameter("tid"));
+                    navigationHelper.navigationByData(NavigationHelper.ACTION_THREAD, map);
+                }
+            }
+        }
+        finish();
+    }
+}package com.huanchengfly.tieba.post.activities;
+
+import android.graphics.drawable.ColorDrawable;
+import android.os.Bundle;
+import android.view.Menu;
+import android.view.MenuItem;
+import android.widget.ListView;
+import android.widget.Toast;
+
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.widget.Toolbar;
+
+import com.google.gson.JsonSyntaxException;
+import com.huanchengfly.tieba.post.ui.theme.utils.ThemeUtils;
+import com.huanchengfly.tieba.post.R;
+import com.huanchengfly.tieba.post.adapters.HistoryListAdapter;
+import com.huanchengfly.tieba.post.models.ThreadHistoryInfoBean;
+import com.huanchengfly.tieba.post.models.database.History;
+import com.huanchengfly.tieba.post.utils.DisplayUtil;
+import com.huanchengfly.tieba.post.utils.HistoryHelper;
+import com.huanchengfly.tieba.post.utils.NavigationHelper;
+import com.huanchengfly.tieba.post.utils.ThemeUtil;
+import com.huanchengfly.tieba.post.utils.GsonUtil;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+public class HistoryActivity extends BaseActivity {
+    private HistoryHelper helper;
+    private NavigationHelper navigationHelper;
+    private ListView mListView;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_history);
+        ThemeUtil.setTranslucentThemeBackground(findViewById(R.id.background));
+        navigationHelper = NavigationHelper.newInstance(this);
+        mListView = (ListView) findViewById(R.id.history_list);
+        mListView.setDivider(new ColorDrawable(ThemeUtils.getColorByAttr(this, R.attr.colorDivider)));
+        mListView.setDividerHeight(DisplayUtil.dp2px(this, 1));
+        mListView.setOnItemClickListener((parent, view, position, id) -> {
+            HistoryListAdapter adapter = (HistoryListAdapter) mListView.getAdapter();
+            History dataBean = (History) adapter.getItem(position);
+            switch (dataBean.getType()) {
+                case HistoryHelper.TYPE_URL:
+                    navigationHelper.navigationByData(NavigationHelper.ACTION_URL, dataBean.getData());
+                    break;
+                case HistoryHelper.TYPE_BA:
+                    navigationHelper.navigationByData(NavigationHelper.ACTION_FORUM, dataBean.getData());
+                    break;
+                case HistoryHelper.TYPE_THREAD:
+                    if (dataBean.getExtras() != null) {
+                        try {
+                            ThreadHistoryInfoBean historyInfoBean = GsonUtil.getGson().fromJson(dataBean.getExtras(), ThreadHistoryInfoBean.class);
+                            if (historyInfoBean == null) {
+                                break;
+                            }
+                            Map<String, String> map = new HashMap<>();
+                            map.put("tid", dataBean.getData());
+                            map.put("pid", historyInfoBean.getPid());
+                            map.put("from", ThreadActivity.FROM_HISTORY);
+                            map.put("seeLz", historyInfoBean.isSeeLz() ? "1" : "0");
+                            navigationHelper.navigationByData(NavigationHelper.ACTION_THREAD, map);
+                            break;
+                        } catch (JsonSyntaxException ignored) {
+                        }
+                    }
+                    Map<String, String> map = new HashMap<>();
+                    map.put("tid", dataBean.getData());
+                    navigationHelper.navigationByData(NavigationHelper.ACTION_THREAD, map);
+                    break;
+            }
+        });
+        Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+        ActionBar actionBar = getSupportActionBar();
+        if (actionBar != null) {
+            actionBar.setDisplayHomeAsUpEnabled(true);
+            actionBar.setTitle(R.string.title_history);
+        }
+        helper = new HistoryHelper(this);
+        refreshData();
+    }
+
+    private void refreshData() {
+        List<History> array = helper.getAll();
+        mListView.setAdapter(new HistoryListAdapter(this, array));
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.menu_history_toolbar, menu);
+        return super.onCreateOptionsMenu(menu);
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch (item.getItemId()) {
+            case android.R.id.home:
+                finish();
+                break;
+            case R.id.menu_delete:
+                helper.delete();
+                Toast.makeText(this, R.string.toast_delete_success, Toast.LENGTH_SHORT).show();
+                refreshData();
+                break;
+            default:
+                break;
+        }
+        return super.onOptionsItemSelected(item);
+    }
+}
+package com.huanchengfly.tieba.post.activities;
+
+import android.os.Bundle;
+import android.widget.Toast;
+
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.widget.Toolbar;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
+
+import com.google.android.material.appbar.AppBarLayout;
+import com.huanchengfly.tieba.post.api.TiebaApi;
+import com.huanchengfly.tieba.post.api.models.web.HotMessageListBean;
+import com.huanchengfly.tieba.post.adapters.HotMessageListAdapter;
+import com.huanchengfly.tieba.post.R;
+import com.huanchengfly.tieba.post.components.MyLinearLayoutManager;
+import com.huanchengfly.tieba.post.components.dividers.CommonDivider;
+import com.huanchengfly.tieba.post.utils.DisplayUtil;
+
+import org.jetbrains.annotations.NotNull;
+
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+
+public class HotMessageListActivity extends BaseActivity {
+    private Toolbar toolbar;
+    private AppBarLayout appBarLayout;
+    private SwipeRefreshLayout refreshLayout;
+    private RecyclerView recyclerView;
+
+    private HotMessageListAdapter adapter;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_hot_message_list);
+        toolbar = (Toolbar) findViewById(R.id.toolbar);
+        appBarLayout = (AppBarLayout) findViewById(R.id.appbar);
+        refreshLayout = (SwipeRefreshLayout) findViewById(R.id.refresh);
+        recyclerView = (RecyclerView) findViewById(R.id.recycler_view);
+        setSupportActionBar(toolbar);
+        ActionBar actionBar = getSupportActionBar();
+        if (actionBar != null) {
+            actionBar.setTitle(R.string.title_hot_message);
+            actionBar.setDisplayHomeAsUpEnabled(true);
+        }
+        LinearLayoutManager layoutManager = new MyLinearLayoutManager(this);
+        recyclerView.setLayoutManager(layoutManager);
+        recyclerView.addItemDecoration(new CommonDivider(this, LinearLayoutManager.VERTICAL, R.drawable.drawable_divider_1dp, DisplayUtil.dp2px(this, 48)));
+        adapter = new HotMessageListAdapter(this);
+        adapter.setLoadFailedView(R.layout.layout_footer_load_failed);
+        adapter.setOnLoadMoreListener(isReload -> refresh());
+        recyclerView.setAdapter(adapter);
+        refreshLayout.setOnRefreshListener(this::refresh);
+        refresh();
+    }
+
+    private void refresh() {
+        refreshLayout.setRefreshing(true);
+        TiebaApi.getInstance().hotMessageList().enqueue(new Callback<HotMessageListBean>() {
+            @Override
+            public void onResponse(@NotNull Call<HotMessageListBean> call, @NotNull Response<HotMessageListBean> response) {
+                adapter.setNewData(response.body().getData().getList().getRet());
+                refreshLayout.setRefreshing(false);
+            }
+
+            @Override
+            public void onFailure(@NotNull Call<HotMessageListBean> call, @NotNull Throwable t) {
+                adapter.loadFailed();
+                refreshLayout.setRefreshing(false);
+                Toast.makeText(HotMessageListActivity.this, t.getMessage(), Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+}
+package com.huanchengfly.tieba.post.activities;
+
+import android.content.Intent;
+import android.graphics.Bitmap;
+import android.os.Bundle;
+import android.os.Handler;
+import android.util.Log;
+import android.webkit.CookieManager;
+import android.webkit.WebView;
+
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.widget.Toolbar;
+
+import com.google.android.material.snackbar.Snackbar;
+import com.huanchengfly.tieba.post.api.interfaces.CommonCallback;
+import com.huanchengfly.tieba.post.R;
+import com.huanchengfly.tieba.post.fragments.WebViewFragment;
+import com.huanchengfly.tieba.post.interfaces.WebViewListener;
+import com.huanchengfly.tieba.post.models.MyInfoBean;
+import com.huanchengfly.tieba.post.models.database.Account;
+import com.huanchengfly.tieba.post.utils.AccountUtil;
+import com.huanchengfly.tieba.post.utils.ThemeUtil;
+import com.huanchengfly.tieba.post.utils.Util;
+
+public class LoginActivity extends BaseActivity implements WebViewListener {
+    public static final String TAG = LoginActivity.class.getSimpleName();
+
+    private static Handler handler = new Handler();
+    private Toolbar toolbar;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_login);
+        ThemeUtil.setTranslucentThemeBackground(findViewById(R.id.background));
+        toolbar = (Toolbar) findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+        ActionBar actionBar = getSupportActionBar();
+        if (actionBar != null) {
+            actionBar.setDisplayHomeAsUpEnabled(true);
+            actionBar.setTitle(R.string.title_login);
+        }
+        if (savedInstanceState == null) {
+            WebViewFragment mWebViewFragment = WebViewFragment.newInstance("https://wappass.baidu.com/passport?login&u=https%3A%2F%2Ftieba.baidu.com%2Findex%2Ftbwise%2Fmine", "LoginActivity");
+            getSupportFragmentManager().beginTransaction()
+                    .replace(R.id.main, mWebViewFragment, "WebViewFragment")
+                    .commit();
+        }
+    }
+
+    @Override
+    public void setTitle(String newTitle) {
+        toolbar.setTitle(newTitle);
+    }
+
+    @Override
+    public void onPageFinished(WebView view, String url) {
+        CookieManager cookieManager = CookieManager.getInstance();
+        String cookies = cookieManager.getCookie(url);
+        Log.i(TAG, "onPageFinished: " + cookies);
+        if (cookies != null) {
+            String[] bdussSplit = cookies.split("BDUSS=");
+            if (bdussSplit.length > 1) {
+                String bduss = bdussSplit[1].split(";")[0];
+                Log.i(TAG, "onPageFinished: " + bduss);
+                if (url.startsWith("https://tieba.baidu.com/index/tbwise/") || url.startsWith("https://tiebac.baidu.com/index/tbwise/")) {
+                    Snackbar snackbar = Util.createSnackbar(view, "请稍后…", Snackbar.LENGTH_INDEFINITE);
+                    snackbar.show();
+                    AccountUtil.updateUserInfoByBduss(this, bduss, new CommonCallback<MyInfoBean>() {
+                        @Override
+                        public void onSuccess(MyInfoBean data) {
+                            Account account = AccountUtil.getLoginInfo(LoginActivity.this);
+                            if (account == null) {
+                                account = AccountUtil.getAccountInfoByBduss(bduss);
+                            }
+                            if (account == null) {
+                                account = AccountUtil.getAccountInfoByUid(String.valueOf(data.getData().getUid()));
+                            }
+                            if (account != null) {
+                                AccountUtil.switchUser(LoginActivity.this, account.getId());
+                                snackbar.setText("登录成功，即将跳转");
+                                handler.postDelayed(() -> {
+                                    snackbar.dismiss();
+                                    finish();
+                                    startActivity(new Intent(LoginActivity.this, UpdateInfoActivity.class));
+                                }, 1500);
+                            } else {
+                                snackbar.setText("登录失败 未知错误");
+                            }
+                        }
+
+                        @Override
+                        public void onFailure(int code, String error) {
+                            snackbar.setText("登录失败，无法获取用户信息 " + error);
+                            view.loadUrl("https://wappass.baidu.com/passport?login&u=https%3A%2F%2Ftieba.baidu.com%2Findex%2Ftbwise%2Fmine");
+                            handler.postDelayed(snackbar::dismiss, 1500);
+                        }
+                    });
+                }
+            }
+        }
+    }
+
+    @Override
+    public void onPageStarted(WebView view, String url, Bitmap favicon) {
+    }
+}
+package com.huanchengfly.tieba.post.activities;
+
+import android.content.Context;
+import android.content.Intent;
+import android.os.Bundle;
+
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.widget.Toolbar;
+
+import com.google.android.material.appbar.AppBarLayout;
+import com.huanchengfly.tieba.post.R;
+import com.huanchengfly.tieba.post.fragments.MessageFragment;
+import com.huanchengfly.tieba.post.utils.ThemeUtil;
+
+public class MessageActivity extends BaseActivity {
+
+    public static Intent createIntent(Context context, int type) {
+        return new Intent(context, MessageActivity.class)
+                .putExtra("type", type);
+    }
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_message_list);
+        ThemeUtil.setTranslucentThemeBackground(findViewById(R.id.background));
+        Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+        AppBarLayout.LayoutParams layoutParams = (AppBarLayout.LayoutParams) toolbar.getLayoutParams();
+        layoutParams.setScrollFlags(AppBarLayout.LayoutParams.SCROLL_FLAG_SCROLL | AppBarLayout.LayoutParams.SCROLL_FLAG_ENTER_ALWAYS);
+        toolbar.setLayoutParams(layoutParams);
+        setSupportActionBar(toolbar);
+        ActionBar actionBar = getSupportActionBar();
+        if (actionBar != null) {
+            actionBar.setDisplayHomeAsUpEnabled(true);
+            actionBar.setTitle(R.string.title_message);
+        }
+        if (savedInstanceState == null) {
+            getSupportFragmentManager().beginTransaction()
+                    .replace(R.id.activity_message_list_content,
+                            MessageFragment.newInstance(getIntent().getIntExtra("type", MessageFragment.TYPE_REPLY_ME), true), MessageFragment.class.getSimpleName()).commit();
+        }
+    }
+}package com.huanchengfly.tieba.post.activities;
+
+import android.content.Intent;
+import android.os.Build;
+
+import com.huanchengfly.tieba.post.ui.intro.BaseIntroActivity;
+import com.huanchengfly.tieba.post.ui.intro.fragments.AppIntroFragment;
+import com.huanchengfly.tieba.post.ui.theme.utils.ThemeUtils;
+import com.huanchengfly.tieba.post.R;
+import com.huanchengfly.tieba.post.fragments.intro.CustomSettingsFragment;
+import com.huanchengfly.tieba.post.fragments.intro.ExploreFragment;
+import com.huanchengfly.tieba.post.fragments.intro.HabitSettingsFragment;
+import com.huanchengfly.tieba.post.fragments.intro.OtherSettingsFragment;
+import com.huanchengfly.tieba.post.fragments.intro.PermissionFragment;
+import com.huanchengfly.tieba.post.utils.AccountUtil;
+import com.huanchengfly.tieba.post.utils.SharedPreferencesUtil;
+
+public class NewIntroActivity extends BaseIntroActivity {
+    @Override
+    protected int getColor() {
+        return ThemeUtils.getColorByAttr(this, R.attr.colorAccent);
+    }
+
+    @Override
+    protected void onCreateIntro() {
+        getAdapter().addFragment(new AppIntroFragment.Builder(this)
+                .setIconRes(R.drawable.ic_splash)
+                .setTitle(getString(R.string.title_welcome))
+                .setSubtitle(getString(R.string.subtitle_welcome))
+                .setTitleTextColor(ThemeUtils.getColorByAttr(this, R.attr.colorText))
+                .setSubtitleTextColor(ThemeUtils.getColorByAttr(this, R.attr.colorTextSecondary))
+                .build());
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            getAdapter().addFragment(new PermissionFragment());
+        }
+        getAdapter().addFragment(new HabitSettingsFragment());
+        getAdapter().addFragment(new CustomSettingsFragment());
+        getAdapter().addFragment(new OtherSettingsFragment());
+        getAdapter().addFragment(new ExploreFragment());
+        getAdapter().addFragment(new AppIntroFragment.Builder(this)
+                .setIconRes(R.drawable.ic_round_emoji_emotions)
+                .setTitle(getString(R.string.title_intro_completed))
+                .setSubtitle(getString(R.string.subtitle_intro_completed))
+                .setIconColor(ThemeUtils.getColorByAttr(this, R.attr.colorAccent))
+                .setTitleTextColor(ThemeUtils.getColorByAttr(this, R.attr.colorText))
+                .setSubtitleTextColor(ThemeUtils.getColorByAttr(this, R.attr.colorTextSecondary))
+                .build());
+    }
+
+    @Override
+    protected void onFinish() {
+        SharedPreferencesUtil.get(this, SharedPreferencesUtil.SP_APP_DATA)
+                .edit()
+                .putBoolean("first", false)
+                .apply();
+        if (!AccountUtil.isLoggedIn(this)) {
+            startActivity(new Intent(this, LoginActivity.class));
+        }
+    }
+}
+package com.huanchengfly.tieba.post.activities;
+
+import android.os.Bundle;
+
+import com.huanchengfly.tieba.post.utils.TiebaUtil;
+
+import me.imid.swipebacklayout.lib.app.SwipeBackActivity;
+
+public class OKSignActivity extends SwipeBackActivity {
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        TiebaUtil.startSign(this);
+        finish();
+    }
+}
+package com.huanchengfly.tieba.post.activities;
+
+import android.annotation.SuppressLint;
+import android.content.Intent;
+import android.graphics.Color;
+import android.net.Uri;
+import android.os.Bundle;
+import android.text.Editable;
+import android.text.TextUtils;
+import android.util.Log;
+import android.view.Menu;
+import android.view.MenuItem;
+import android.view.View;
+import android.view.ViewGroup;
+import android.webkit.WebView;
+import android.widget.FrameLayout;
+import android.widget.GridView;
+import android.widget.RelativeLayout;
+import android.widget.Toast;
+
+import androidx.annotation.NonNull;
+import androidx.appcompat.widget.Toolbar;
+import androidx.recyclerview.widget.ItemTouchHelper;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+import androidx.viewpager.widget.ViewPager;
+
+import com.google.android.material.tabs.TabLayout;
+import com.huanchengfly.tieba.post.R;
+import com.huanchengfly.tieba.post.adapters.InsertPhotoAdapter;
+import com.huanchengfly.tieba.post.adapters.TabViewPagerAdapter;
+import com.huanchengfly.tieba.post.adapters.TextWatcherAdapter;
+import com.huanchengfly.tieba.post.api.TiebaApi;
+import com.huanchengfly.tieba.post.api.interfaces.CommonCallback;
+import com.huanchengfly.tieba.post.api.models.WebReplyResultBean;
+import com.huanchengfly.tieba.post.api.retrofit.exception.TiebaException;
+import com.huanchengfly.tieba.post.components.EmotionViewFactory;
+import com.huanchengfly.tieba.post.components.dialogs.LoadingDialog;
+import com.huanchengfly.tieba.post.interfaces.ReplyContentCallback;
+import com.huanchengfly.tieba.post.interfaces.UploadCallback;
+import com.huanchengfly.tieba.post.models.PhotoInfoBean;
+import com.huanchengfly.tieba.post.models.ReplyInfoBean;
+import com.huanchengfly.tieba.post.models.database.Draft;
+import com.huanchengfly.tieba.post.utils.AssetUtil;
+import com.huanchengfly.tieba.post.utils.EmotionUtil;
+import com.huanchengfly.tieba.post.utils.GsonUtil;
+import com.huanchengfly.tieba.post.utils.StringUtil;
+import com.huanchengfly.tieba.post.utils.ThemeUtil;
+import com.huanchengfly.tieba.post.utils.UploadHelper;
+import com.huanchengfly.tieba.post.utils.Util;
+import com.huanchengfly.tieba.post.widgets.edittext.widget.UndoableEditText;
+import com.huanchengfly.tieba.post.widgets.theme.TintConstraintLayout;
+import com.huanchengfly.tieba.post.widgets.theme.TintImageView;
+import com.zhihu.matisse.Matisse;
+
+import org.jetbrains.annotations.NotNull;
+import org.litepal.LitePal;
+
+import java.util.List;
+import java.util.Objects;
+
+import butterknife.BindView;
+import cn.dreamtobe.kpswitch.util.KPSwitchConflictUtil;
+import cn.dreamtobe.kpswitch.util.KeyboardUtil;
+import cn.dreamtobe.kpswitch.widget.KPSwitchFSPanelFrameLayout;
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+
+public class ReplyActivity extends BaseActivity implements View.OnClickListener {
+    public static final int REQUEST_CODE_CHOOSE = 2;
+
+    public static final String TAG = "ReplyActivity";
+
+    @BindView(R.id.activity_reply_edit_text)
+    UndoableEditText editText;
+    @BindView(R.id.activity_reply_panel_root)
+    KPSwitchFSPanelFrameLayout panelFrameLayout;
+    @BindView(R.id.activity_reply_emotion)
+    RelativeLayout emotionView;
+    @BindView(R.id.activity_reply_insert_photo)
+    FrameLayout insertImageView;
+    @BindView(R.id.activity_reply_edit_emotion)
+    TintImageView emotionBtn;
+    @BindView(R.id.activity_reply_edit_insert_photo)
+    TintImageView insertImageBtn;
+    @BindView(R.id.activity_reply_emotion_view_pager)
+    ViewPager emotionViewPager;
+    @BindView(R.id.activity_reply_insert_photo_view)
+    RecyclerView insertView;
+    @BindView(R.id.webview_container)
+    FrameLayout webViewContainer;
+    @BindView(R.id.toolbar)
+    Toolbar toolbar;
+
+    private ReplyInfoBean replyInfoBean;
+    private LoadingDialog loadingDialog;
+    private InsertPhotoAdapter insertPhotoAdapter;
+    private Callback<WebReplyResultBean> mCallback;
+    private MenuItem sendItem;
+    private boolean replySuccess;
+    private String content;
+
+    private WebView mWebView;
+
+    @Override
+    public boolean isNeedImmersionBar() {
+        return false;
+    }
+
+    @Override
+    protected int getLayoutId() {
+        return R.layout.activity_reply;
+    }
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setSwipeBackEnable(false);
+        if (ThemeUtil.THEME_TRANSLUCENT.equals(ThemeUtil.getTheme(this))) {
+            TintConstraintLayout constraintLayout = (TintConstraintLayout) findViewById(R.id.activity_reply_layout);
+            constraintLayout.setBackgroundTintResId(0);
+            ThemeUtil.setTranslucentBackground(constraintLayout);
+        }
+        Util.setStatusBarTransparent(this);
+        getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+        getWindow().getDecorView().setBackgroundColor(getResources().getColor(R.color.transparent));
+        getWindow().setBackgroundDrawableResource(R.drawable.bg_trans);
+        initData();
+        initView();
+    }
+
+    private void destroyWebView() {
+        if (mWebView != null) {
+            ((ViewGroup) mWebView.getParent()).removeView(mWebView);
+            mWebView.removeAllViews();
+            mWebView.destroy();
+            mWebView = null;
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (mWebView != null) {
+            destroyWebView();
+        }
+        super.onDestroy();
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        panelFrameLayout.recordKeyboardStatus(getWindow());
+        if (replyInfoBean != null && !replySuccess) {
+            new Draft(replyInfoBean.hash(), editText.getText() == null ? "" : editText.getText().toString())
+                    .saveOrUpdate("hash = ?", replyInfoBean.hash());
+        } else if (replySuccess) {
+            Draft draft = LitePal.where("hash = ?", replyInfoBean.hash())
+                    .findFirst(Draft.class);
+            if (draft != null) {
+                draft.delete();
+            }
+        }
+    }
+
+    private void initData() {
+        Intent intent = getIntent();
+        String jsonData = intent.getStringExtra("data");
+        replyInfoBean = GsonUtil.getGson().fromJson(jsonData, ReplyInfoBean.class);
+        Draft draft = LitePal.where("hash = ?", replyInfoBean.hash())
+                .findFirst(Draft.class);
+        if (draft != null) {
+            content = draft.getContent();
+        }
+    }
+
+    protected void initView() {
+        setSupportActionBar(toolbar);
+        Objects.requireNonNull(getSupportActionBar()).setDisplayHomeAsUpEnabled(true);
+        ItemTouchHelper mItemTouchHelper = new ItemTouchHelper(new ItemTouchHelper.Callback() {
+            @Override
+            public void clearView(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder) {
+                super.clearView(recyclerView, viewHolder);
+                viewHolder.itemView.setBackgroundColor(Color.TRANSPARENT);
+            }
+
+            @Override
+            public void onSelectedChanged(RecyclerView.ViewHolder viewHolder, int actionState) {
+                super.onSelectedChanged(viewHolder, actionState);
+                if (actionState == ItemTouchHelper.ACTION_STATE_DRAG) {
+                    viewHolder.itemView.setBackgroundColor(Util.getColorByAttr(ReplyActivity.this, R.attr.colorControlHighlight, R.color.transparent));
+                }
+            }
+
+            @Override
+            public int getMovementFlags(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder) {
+                int dragFlags = 0, swiped = 0;
+                if (viewHolder.getAdapterPosition() < insertPhotoAdapter.getItemCount() - 1) {
+                    swiped = ItemTouchHelper.UP | ItemTouchHelper.DOWN;
+                    if (viewHolder.getAdapterPosition() < insertPhotoAdapter.getItemCount() - 2 && viewHolder.getAdapterPosition() > 0) {
+                        dragFlags = ItemTouchHelper.RIGHT | ItemTouchHelper.LEFT;
+                    } else if (viewHolder.getAdapterPosition() == insertPhotoAdapter.getItemCount() - 2) {
+                        dragFlags = ItemTouchHelper.LEFT;
+                    } else if (viewHolder.getAdapterPosition() == 0) {
+                        dragFlags = ItemTouchHelper.RIGHT;
+                    }
+                }
+                return makeMovementFlags(dragFlags, swiped);
+            }
+
+            @Override
+            public boolean onMove(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder, @NonNull RecyclerView.ViewHolder target) {
+                int oldPosition = viewHolder.getAdapterPosition();
+                int newPosition = target.getAdapterPosition();
+                if (newPosition < insertPhotoAdapter.getItemCount() - 1) {
+                    if (oldPosition < newPosition) {
+                        for (int i = oldPosition; i < newPosition; i++) {
+                            insertPhotoAdapter.swap(i, i + 1);
+                        }
+                    } else {
+                        for (int i = oldPosition; i > newPosition; i--) {
+                            insertPhotoAdapter.swap(i, i - 1);
+                        }
+                    }
+                    insertPhotoAdapter.notifyItemMoved(oldPosition, newPosition);
+                    return true;
+                }
+                return false;
+            }
+
+            @Override
+            public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
+                int position = viewHolder.getAdapterPosition();
+                insertPhotoAdapter.remove(position);
+            }
+        });
+        mItemTouchHelper.attachToRecyclerView(insertView);
+        findViewById(R.id.activity_reply_root).setOnClickListener(this);
+        findViewById(R.id.activity_reply_layout).setOnClickListener(this);
+        toolbar.setNavigationIcon(R.drawable.ic_reply_toolbar_round_close);
+        if (replyInfoBean.getPid() == null && replyInfoBean.getFloorNum() == null) {
+            insertImageBtn.setVisibility(View.VISIBLE);
+        } else {
+            insertImageBtn.setVisibility(View.INVISIBLE);
+        }
+        insertPhotoAdapter = new InsertPhotoAdapter(this);
+        insertView.setAdapter(insertPhotoAdapter);
+        LinearLayoutManager layoutManager = new LinearLayoutManager(this);
+        layoutManager.setOrientation(RecyclerView.HORIZONTAL);
+        insertView.setLayoutManager(layoutManager);
+        if (replyInfoBean.getReplyUser() != null) {
+            editText.setHint(getString(R.string.hint_reply, replyInfoBean.getReplyUser()));
+        }
+        TabLayout tabLayout = (TabLayout) findViewById(R.id.activity_reply_emotion_tab);
+        TabViewPagerAdapter emotionViewPagerAdapter = new TabViewPagerAdapter();
+        GridView classicEmotionGridView = new GridView(this);
+        GridView emojiEmotionGridView = new GridView(this);
+        EmotionViewFactory.initGridView(this, EmotionUtil.EMOTION_CLASSIC_WEB_TYPE, classicEmotionGridView);
+        EmotionViewFactory.initGridView(this, EmotionUtil.EMOTION_EMOJI_WEB_TYPE, emojiEmotionGridView);
+        emotionViewPagerAdapter.addView(classicEmotionGridView, getString(R.string.title_emotion_classic));
+        emotionViewPagerAdapter.addView(emojiEmotionGridView, getString(R.string.title_emotion_emoji));
+        emotionViewPager.setAdapter(emotionViewPagerAdapter);
+        tabLayout.setupWithViewPager(emotionViewPager);
+        if (content != null) {
+            editText.getMgr().disable();
+            editText.setText(StringUtil.getEmotionContent(EmotionUtil.EMOTION_ALL_WEB_TYPE, editText, content));
+            editText.getMgr().enable();
+        }
+        initListener();
+    }
+
+    private boolean canSend() {
+        return (!(editText.getText().toString().isEmpty()) |
+                insertPhotoAdapter.getFileList().size() > 0);
+    }
+
+    private boolean needUpload() {
+        boolean needUpload = false;
+        if (replyInfoBean.isSubFloor()) {
+            return false;
+        }
+        for (PhotoInfoBean photoInfoBean : insertPhotoAdapter.getFileList()) {
+            if (photoInfoBean.getWebUploadPicBean() == null) {
+                needUpload = true;
+                break;
+            }
+        }
+        return needUpload;
+    }
+
+    private String getReplyContent() {
+        StringBuilder builder = new StringBuilder();
+        if (replyInfoBean.isSubFloor() && (replyInfoBean.getReplyUser() != null)) {
+            builder.append("回复 ")
+                    .append(replyInfoBean.getReplyUser())
+                    .append(" :");
+        }
+        builder.append(editText.getText());
+        if (getAppPreferences().getLittleTail() != null) {
+            builder.append("\n")
+                    .append(getAppPreferences().getLittleTail());
+        }
+        return builder.toString();
+    }
+
+    private void getImageInfo(ReplyContentCallback callback) {
+        StringBuilder builder = new StringBuilder();
+        if (hasPhoto()) {
+            if (!needUpload()) {
+                for (PhotoInfoBean photoInfoBean : insertPhotoAdapter.getFileList()) {
+                    if (photoInfoBean.getWebUploadPicBean() != null) {
+                        builder.append(photoInfoBean.getWebUploadPicBean().getImageInfo());
+                        if ((insertPhotoAdapter.getFileList().size() - 1) > insertPhotoAdapter.getFileList().indexOf(photoInfoBean)) {
+                            builder.append("|");
+                        }
+                    }
+                }
+                callback.onSuccess(builder.toString());
+                return;
+            }
+            UploadHelper.with(this)
+                    .setFileList(insertPhotoAdapter.getFileList())
+                    .setCallback(new UploadCallback() {
+                        @Override
+                        public void onSuccess(List<PhotoInfoBean> photoInfoBeans) {
+                            for (PhotoInfoBean photoInfoBean : photoInfoBeans) {
+                                if (photoInfoBean.getWebUploadPicBean() != null) {
+                                    builder.append(photoInfoBean.getWebUploadPicBean().getImageInfo());
+                                    if ((photoInfoBeans.size() - 1) > photoInfoBeans.indexOf(photoInfoBean)) {
+                                        builder.append("|");
+                                    }
+                                }
+                            }
+                            Log.i(TAG, "onSuccess: " + builder.toString());
+                            callback.onSuccess(builder.toString());
+                        }
+
+                        @Override
+                        public void onStart(int total) {
+                            callback.onStart(total);
+                        }
+
+                        @Override
+                        public void onProgress(int current, int total) {
+                            callback.onProgress(current, total);
+                        }
+
+                        @Override
+                        public void onFailure(String error) {
+                            callback.onFailure(error);
+                        }
+                    })
+                    .start();
+            return;
+        }
+        callback.onSuccess("");
+    }
+
+    private boolean hasPhoto() {
+        return insertPhotoAdapter.getFileList() != null && insertPhotoAdapter.getFileList().size() > 0;
+    }
+
+    private void setEnabled(TintImageView imageButton, boolean enable) {
+        imageButton.setClickable(enable);
+        imageButton.setEnabled(enable);
+    }
+
+    private void initListener() {
+        TintImageView undo = (TintImageView) findViewById(R.id.activity_reply_edit_undo);
+        TintImageView redo = (TintImageView) findViewById(R.id.activity_reply_edit_redo);
+        TintImageView clear = (TintImageView) findViewById(R.id.activity_reply_edit_clear);
+        undo.setOnClickListener(this);
+        setEnabled(undo, false);
+        redo.setOnClickListener(this);
+        setEnabled(redo, false);
+        clear.setOnClickListener(this);
+        setEnabled(clear, false);
+        editText.addTextChangedListener(new TextWatcherAdapter() {
+            @Override
+            public void afterTextChanged(Editable editable) {
+                super.afterTextChanged(editable);
+                setEnabled(undo, editText.canUndo());
+                setEnabled(redo, editText.canRedo());
+                setEnabled(clear, !TextUtils.isEmpty(editable));
+                if (sendItem != null) sendItem.setEnabled(canSend());
+            }
+        });
+        KeyboardUtil.attach(this, panelFrameLayout);
+        KPSwitchConflictUtil.attach(
+                panelFrameLayout,
+                editText,
+                new KPSwitchConflictUtil.SubPanelAndTrigger(emotionView, emotionBtn),
+                new KPSwitchConflictUtil.SubPanelAndTrigger(insertImageView, insertImageBtn)
+        );
+        EmotionUtil.GlobalOnItemClickManagerUtil.getInstance(this).attachToEditText(editText);
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.menu_reply_toolbar, menu);
+        sendItem = menu.findItem(R.id.menu_send);
+        sendItem.setEnabled(false);
+        return super.onCreateOptionsMenu(menu);
+    }
+
+    @Override
+    public void finish() {
+        overridePendingTransition(R.anim.in_bottom, R.anim.out_bottom);
+        super.finish();
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId() == R.id.menu_send) {
+            mCallback = new Callback<WebReplyResultBean>() {
+                @Override
+                public void onResponse(@NotNull Call<WebReplyResultBean> call, @NotNull Response<WebReplyResultBean> response) {
+                    WebReplyResultBean data = response.body();
+                    if (loadingDialog != null) loadingDialog.cancel();
+                    Toast.makeText(ReplyActivity.this, R.string.toast_reply_success, Toast.LENGTH_SHORT).show();
+                    sendBroadcast(new Intent()
+                            .setAction(ThreadActivity.ACTION_REPLY_SUCCESS)
+                            .putExtra("pid", replyInfoBean.getPid() != null ? replyInfoBean.getPid() : data.getData().getPid()));
+                    replySuccess = true;
+                    finish();
+                }
+
+                @Override
+                public void onFailure(@NotNull Call<WebReplyResultBean> call, @NotNull Throwable t) {
+                    if (loadingDialog != null) loadingDialog.cancel();
+                    int code = t instanceof TiebaException ? ((TiebaException) t).getCode() : -1;
+                    Toast.makeText(ReplyActivity.this, getString(R.string.toast_reply_failed, code, t.getMessage()), Toast.LENGTH_SHORT).show();
+                }
+            };
+            realReply();
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private void getBSK(String tbs, CommonCallback<String> commonCallback) {
+        mWebView = new WebView(this);
+        mWebView.getSettings().setJavaScriptEnabled(true);
+        webViewContainer.addView(mWebView);
+        mWebView.evaluateJavascript(AssetUtil.getStringFromAsset(this, "new_bsk.js"), value -> {
+            mWebView.evaluateJavascript("get_bsk_data(\"" + tbs + "\")", value1 -> {
+                destroyWebView();
+                if (commonCallback != null)
+                    commonCallback.onSuccess(value1.replaceAll("\"", ""));
+            });
+        });
+    }
+
+    private void realReply(/*String code, String md5*/) {
+        loadingDialog = new LoadingDialog(this);
+        loadingDialog.show();
+        getImageInfo(new ReplyContentCallback() {
+            @Override
+            public void onSuccess(String data) {
+                loadingDialog.setTipText("正在提交...");
+                getBSK(replyInfoBean.getTbs(), new CommonCallback<String>() {
+                    @Override
+                    public void onSuccess(String bsk) {
+                        if (replyInfoBean.getPid() == null && replyInfoBean.getFloorNum() == null) {
+                            TiebaApi.getInstance().webReply(
+                                    replyInfoBean.getForumId(),
+                                    replyInfoBean.getForumName(),
+                                    replyInfoBean.getThreadId(),
+                                    replyInfoBean.getTbs(),
+                                    getReplyContent(),
+                                    data,
+                                    replyInfoBean.getNickName(),
+                                    replyInfoBean.getPn(),
+                                    bsk
+                            ).enqueue(mCallback);
+                        } else {
+                            if (replyInfoBean.isSubFloor() && replyInfoBean.getSpid() != null) {
+                                TiebaApi.getInstance().webReply(replyInfoBean.getForumId(), replyInfoBean.getForumName(),
+                                        replyInfoBean.getThreadId(),
+                                        replyInfoBean.getTbs(),
+                                        getReplyContent(),
+                                        data,
+                                        replyInfoBean.getNickName(),
+                                        replyInfoBean.getPid(),
+                                        replyInfoBean.getSpid(),
+                                        replyInfoBean.getFloorNum(),
+                                        replyInfoBean.getPn(),
+                                        bsk).enqueue(mCallback);
+                            } else {
+                                TiebaApi.getInstance().webReply(replyInfoBean.getForumId(), replyInfoBean.getForumName(),
+                                        replyInfoBean.getThreadId(),
+                                        replyInfoBean.getTbs(),
+                                        getReplyContent(),
+                                        data,
+                                        replyInfoBean.getNickName(),
+                                        replyInfoBean.getPid(),
+                                        replyInfoBean.getFloorNum(),
+                                        replyInfoBean.getPn(),
+                                        bsk).enqueue(mCallback);
+                            }
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(int code, String error) {
+                    }
+                });
+            }
+
+            @Override
+            public void onStart(int total) {
+                loadingDialog.setTipText("正在上传图片...(0/" + total + ")");
+            }
+
+            @Override
+            public void onProgress(int current, int total) {
+                loadingDialog.setTipText("正在上传图片...(" + current + "/" + total + ")");
+            }
+
+            @Override
+            public void onFailure(String error) {
+                loadingDialog.cancel();
+                Toast.makeText(ReplyActivity.this, error, Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQUEST_CODE_CHOOSE && resultCode == RESULT_OK) {
+            List<Uri> uriList = Matisse.obtainResult(data);
+            List<PhotoInfoBean> photoInfoBeans = insertPhotoAdapter.getFileList();
+            for (Uri uri : uriList) {
+                PhotoInfoBean infoBean = new PhotoInfoBean(this, uri);
+                photoInfoBeans.add(infoBean);
+            }
+            insertPhotoAdapter.setFileList(photoInfoBeans);
+            sendItem.setEnabled(true);
+        }
+    }
+
+    @Override
+    public void onClick(View v) {
+        switch (v.getId()) {
+            case R.id.activity_reply_root:
+                finish();
+                break;
+            case R.id.activity_reply_edit_undo:
+                editText.undo();
+                break;
+            case R.id.activity_reply_edit_redo:
+                editText.redo();
+                break;
+            case R.id.activity_reply_edit_clear:
+                editText.setText(null);
+                break;
+        }
+    }
+}package com.huanchengfly.tieba.post.activities;
+
+import android.content.Intent;
+import android.os.Bundle;
+import android.text.TextUtils;
+
+import com.google.android.material.tabs.TabLayout;
+import com.huanchengfly.tieba.post.ui.theme.utils.ThemeUtils;
+import com.huanchengfly.tieba.post.R;
+import com.huanchengfly.tieba.post.adapters.FragmentTabViewPagerAdapter;
+import com.huanchengfly.tieba.post.fragments.SearchForumFragment;
+import com.huanchengfly.tieba.post.fragments.SearchThreadFragment;
+import com.huanchengfly.tieba.post.fragments.SearchUserFragment;
+import com.huanchengfly.tieba.post.models.database.SearchHistory;
+import com.huanchengfly.tieba.post.utils.ThemeUtil;
+import com.huanchengfly.tieba.post.widgets.MyViewPager;
+import com.lapism.searchview.Search;
+import com.lapism.searchview.widget.SearchView;
+
+public class SearchActivity extends BaseActivity implements Search.OnQueryTextListener {
+    public static final String TAG = SearchActivity.class.getSimpleName();
+    public static final String EXTRA_KEYWORD = "keyword";
+
+    private String mKeyword;
+    private TabLayout mTabLayout;
+    private SearchForumFragment searchForumFragment;
+    private SearchThreadFragment searchThreadFragment;
+    private SearchUserFragment searchUserFragment;
+    private SearchView mSearchView;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_search);
+        ThemeUtil.setTranslucentThemeBackground(findViewById(R.id.background));
+        Intent intent = getIntent();
+        mKeyword = intent.getStringExtra(EXTRA_KEYWORD);
+        mSearchView = (SearchView) findViewById(R.id.toolbar_search_view);
+        mSearchView.setTheme(ThemeUtil.isNightMode(this) ? Search.Theme.DARK : Search.Theme.LIGHT);
+        mSearchView.setShadow(false);
+        mSearchView.setBackgroundColor(ThemeUtils.getColorByAttr(this, R.attr.colorToolbar));
+        mSearchView.setClearColor(ThemeUtils.getColorByAttr(this, R.attr.colorToolbarItem));
+        mSearchView.setLogoColor(ThemeUtils.getColorByAttr(this, R.attr.colorToolbarItem));
+        mSearchView.setTextColor(ThemeUtils.getColorByAttr(this, R.attr.colorToolbarItem));
+        mSearchView.setHintColor(ThemeUtils.getColorByAttr(this, R.attr.color_toolbar_item_secondary));
+        mTabLayout = (TabLayout) findViewById(R.id.tab);
+        MyViewPager mViewPager = (MyViewPager) findViewById(R.id.view_pager);
+        mViewPager.setOffscreenPageLimit(3);
+        mSearchView.setQuery(mKeyword, false);
+        mSearchView.setOnQueryTextListener(this);
+        mSearchView.setOnLogoClickListener(this::finish);
+        FragmentTabViewPagerAdapter mAdapter = new FragmentTabViewPagerAdapter(getSupportFragmentManager());
+        searchForumFragment = SearchForumFragment.newInstance(mKeyword);
+        searchThreadFragment = SearchThreadFragment.newInstance(mKeyword);
+        searchUserFragment = SearchUserFragment.newInstance(mKeyword);
+        mAdapter.addFragment(searchForumFragment, "吧");
+        mAdapter.addFragment(searchThreadFragment, "贴");
+        mAdapter.addFragment(searchUserFragment, "人");
+        mViewPager.setAdapter(mAdapter);
+        mTabLayout.setupWithViewPager(mViewPager);
+    }
+
+    @Override
+    public boolean onQueryTextSubmit(CharSequence query) {
+        setKeyword(query.toString());
+        new SearchHistory(query.toString())
+                .saveOrUpdate("content = ?", query.toString());
+        return true;
+    }
+
+    private void setKeyword(String keyword) {
+        if (TextUtils.equals(keyword, mKeyword)) {
+            return;
+        }
+        mKeyword = keyword;
+        searchForumFragment.setKeyword(keyword, mTabLayout.getSelectedTabPosition() == 0);
+        searchThreadFragment.setKeyword(keyword, mTabLayout.getSelectedTabPosition() == 1);
+        searchUserFragment.setKeyword(keyword, mTabLayout.getSelectedTabPosition() == 2);
+    }
+
+    @Override
+    public void onQueryTextChange(CharSequence newText) {
+    }
+}package com.huanchengfly.tieba.post.activities;
+
+import android.content.Intent;
+import android.graphics.Color;
+import android.os.Bundle;
+import android.view.ViewGroup;
+
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
+
+import com.huanchengfly.tieba.post.api.TiebaApi;
+import com.huanchengfly.tieba.post.api.models.SearchPostBean;
+import com.huanchengfly.tieba.post.R;
+import com.huanchengfly.tieba.post.adapters.SearchPostAdapter;
+import com.huanchengfly.tieba.post.components.MyLinearLayoutManager;
+import com.huanchengfly.tieba.post.components.dividers.RecycleViewDivider;
+import com.huanchengfly.tieba.post.utils.ThemeUtil;
+import com.huanchengfly.tieba.post.utils.Util;
+import com.lapism.searchview.Search;
+import com.lapism.searchview.widget.SearchView;
+
+import org.jetbrains.annotations.NotNull;
+
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+
+public class SearchPostActivity extends BaseActivity implements Search.OnQueryTextListener {
+    public static final String TAG = SearchPostActivity.class.getSimpleName();
+    public static final String PARAM_FORUM = "forum_name";
+    public static final String PARAM_KEYWORD = "keyword";
+    private SwipeRefreshLayout refreshLayout;
+    private RecyclerView recyclerView;
+    private SearchPostAdapter searchPostAdapter;
+    private String forumName;
+    private String keyword;
+    private int page;
+    private SearchView searchView;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_search_post);
+        ThemeUtil.setTranslucentThemeBackground(findViewById(R.id.background));
+        Util.setStatusBarTransparent(this);
+        getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+        getWindow().getDecorView().setBackgroundColor(Color.TRANSPARENT);
+        getWindow().setBackgroundDrawableResource(R.drawable.bg_trans);
+        Intent intent = getIntent();
+        forumName = intent.getStringExtra(PARAM_FORUM);
+        if (forumName == null) {
+            finish();
+        }
+        findView();
+        initView();
+        keyword = intent.getStringExtra(PARAM_KEYWORD);
+        if (keyword != null) {
+            searchView.setText(keyword);
+            refresh();
+        }
+    }
+
+    private void findView() {
+        searchView = (SearchView) findViewById(R.id.toolbar_search_view);
+        refreshLayout = (SwipeRefreshLayout) findViewById(R.id.search_post_refresh_layout);
+        recyclerView = (RecyclerView) findViewById(R.id.search_post_recycler_view);
+    }
+
+    private void initView() {
+        ThemeUtil.setThemeForSwipeRefreshLayout(refreshLayout);
+        searchPostAdapter = new SearchPostAdapter(this);
+        searchPostAdapter.setLoadingView(R.layout.layout_footer_loading);
+        searchPostAdapter.setLoadEndView(R.layout.layout_footer_loadend);
+        searchPostAdapter.setLoadFailedView(R.layout.layout_footer_load_failed);
+        searchPostAdapter.setOnLoadMoreListener(this::loadMore);
+        recyclerView.setLayoutManager(new MyLinearLayoutManager(this));
+        recyclerView.addItemDecoration(new RecycleViewDivider(this, LinearLayoutManager.VERTICAL, R.drawable.drawable_divider_8dp));
+        recyclerView.setAdapter(searchPostAdapter);
+        refreshLayout.setOnRefreshListener(this::refresh);
+        searchView.setHint(getString(R.string.hint_search_in_ba, forumName));
+        searchView.setOnQueryTextListener(this);
+        searchView.setOnLogoClickListener(this::finish);
+    }
+
+    public void refresh() {
+        refreshLayout.setRefreshing(true);
+        page = 1;
+        TiebaApi.getInstance().searchPost(keyword, forumName, false, page, 30).enqueue(new Callback<SearchPostBean>() {
+            @Override
+            public void onResponse(@NotNull Call<SearchPostBean> call, @NotNull Response<SearchPostBean> response) {
+                SearchPostBean data = response.body();
+                if (!"1".equals(data.getPage().getHasMore())) {
+                    searchPostAdapter.loadEnd();
+                }
+                searchPostAdapter.setNewData(data.getPostList());
+                refreshLayout.setRefreshing(false);
+            }
+
+            @Override
+            public void onFailure(@NotNull Call<SearchPostBean> call, @NotNull Throwable t) {
+                searchPostAdapter.loadFailed();
+                refreshLayout.setRefreshing(false);
+            }
+        });
+    }
+
+    public void loadMore(boolean isReload) {
+        if (!isReload) {
+            page += 1;
+        }
+        TiebaApi.getInstance().searchPost(keyword, forumName, false, page, 30).enqueue(new Callback<SearchPostBean>() {
+            @Override
+            public void onResponse(@NotNull Call<SearchPostBean> call, @NotNull Response<SearchPostBean> response) {
+                SearchPostBean data = response.body();
+                if (!"1".equals(data.getPage().getHasMore())) {
+                    searchPostAdapter.loadEnd();
+                }
+                searchPostAdapter.setLoadMoreData(data.getPostList());
+            }
+
+            @Override
+            public void onFailure(@NotNull Call<SearchPostBean> call, @NotNull Throwable t) {
+                searchPostAdapter.loadFailed();
+            }
+        });
+    }
+
+    @Override
+    public boolean onQueryTextSubmit(CharSequence query) {
+        keyword = query.toString();
+        refresh();
+        return true;
+    }
+
+    @Override
+    public void onQueryTextChange(CharSequence newText) {
+    }
+}
+package com.huanchengfly.tieba.post.activities;
+
+import android.os.Bundle;
+
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.widget.Toolbar;
+import androidx.fragment.app.FragmentManager;
+
+import com.huanchengfly.tieba.post.R;
+import com.huanchengfly.tieba.post.fragments.SettingsFragment;
+import com.huanchengfly.tieba.post.utils.ThemeUtil;
+
+public class SettingsActivity extends BaseActivity {
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_settings);
+        ThemeUtil.setTranslucentThemeBackground(findViewById(R.id.background));
+        Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+        ActionBar actionBar = getSupportActionBar();
+        if (actionBar != null) {
+            actionBar.setHomeButtonEnabled(true);
+            actionBar.setDisplayHomeAsUpEnabled(true);
+            actionBar.setTitle(R.string.title_settings);
+        }
+        String scrollToPreference = getIntent().getStringExtra("scroll_to_preference");
+        FragmentManager fragmentManager = getSupportFragmentManager();
+        SettingsFragment settingsFragment = new SettingsFragment();
+        fragmentManager.beginTransaction()
+                .add(R.id.main, settingsFragment)
+                .commit();
+        if (scrollToPreference != null) {
+            settingsFragment.scrollToPreference(scrollToPreference);
+        }
+    }
+}
+package com.huanchengfly.tieba.post.activities;
+
+import android.annotation.SuppressLint;
+import android.content.Intent;
+import android.os.Bundle;
+
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.widget.Toolbar;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+import androidx.recyclerview.widget.SimpleItemAnimator;
+
+import com.huanchengfly.tieba.post.R;
+import com.huanchengfly.tieba.post.adapters.ThemeAdapter;
+import com.huanchengfly.tieba.post.utils.SharedPreferencesUtil;
+import com.huanchengfly.tieba.post.utils.ThemeUtil;
+
+import java.util.Arrays;
+import java.util.List;
+
+import static com.huanchengfly.tieba.post.utils.ThemeUtil.SP_TRANSLUCENT_THEME_BACKGROUND_PATH;
+import static com.huanchengfly.tieba.post.utils.ThemeUtil.THEME_TRANSLUCENT;
+
+public class ThemeActivity extends BaseActivity {
+    public static final String TAG = "ThemeActivity";
+
+    private long lastClickTimestamp = 0;
+    private int clickTimes = 0;
+
+    private RecyclerView mRecyclerView;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_theme);
+        mRecyclerView = (RecyclerView) findViewById(R.id.theme_list);
+        mRecyclerView.setLayoutManager(new LinearLayoutManager(this));
+        ThemeAdapter themeAdapter = new ThemeAdapter(this);
+        mRecyclerView.setAdapter(themeAdapter);
+        if (mRecyclerView.getItemAnimator() != null) {
+            mRecyclerView.getItemAnimator().setAddDuration(0);
+            mRecyclerView.getItemAnimator().setChangeDuration(0);
+            mRecyclerView.getItemAnimator().setMoveDuration(0);
+            mRecyclerView.getItemAnimator().setRemoveDuration(0);
+            ((SimpleItemAnimator) mRecyclerView.getItemAnimator()).setSupportsChangeAnimations(false);
+        }
+        Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+        /*
+        toolbar.setOnClickListener(v -> {
+            if (System.currentTimeMillis() - lastClickTimestamp < 2000) {
+                clickTimes += 1;
+            } else {
+                clickTimes = 0;
+            }
+            if (clickTimes >= 7) {
+                clickTimes = 0;
+                startActivity(new Intent(this, TranslucentThemeActivity.class));
+                Toast.makeText(this, "\uD83D\uDC23", Toast.LENGTH_SHORT).show();
+                finish();
+            } else if (clickTimes >= 2) {
+                Toast.makeText(this, "\uD83E\uDD5A", Toast.LENGTH_SHORT).show();
+            }
+            lastClickTimestamp = System.currentTimeMillis();
+        });
+        */
+        setSupportActionBar(toolbar);
+        ActionBar actionBar = getSupportActionBar();
+        if (actionBar != null) {
+            actionBar.setDisplayHomeAsUpEnabled(true);
+            actionBar.setTitle(R.string.title_theme);
+        }
+        List<String> values = Arrays.asList(getResources().getStringArray(R.array.theme_values));
+        themeAdapter.setOnItemClickListener((itemView, str, position, viewType) -> {
+            String backgroundFilePath = SharedPreferencesUtil.get(this, SharedPreferencesUtil.SP_SETTINGS)
+                    .getString(SP_TRANSLUCENT_THEME_BACKGROUND_PATH, null);
+            if (values.get(position).equals(THEME_TRANSLUCENT) && backgroundFilePath == null) {
+                startActivity(new Intent(this, TranslucentThemeActivity.class));
+            }
+            setTheme(values.get(position));
+        });
+        mRecyclerView.setAdapter(themeAdapter);
+        ThemeUtil.setTranslucentThemeBackground(findViewById(R.id.background));
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        ThemeUtil.setTranslucentThemeBackground(findViewById(R.id.background));
+    }
+
+    @SuppressLint("ApplySharedPref")
+    private void setTheme(String theme) {
+        ThemeUtil.getSharedPreferences(ThemeActivity.this).edit().putString(ThemeUtil.SP_THEME, theme).commit();
+        if (!theme.contains("dark")) {
+            ThemeUtil.getSharedPreferences(ThemeActivity.this).edit().putString(ThemeUtil.SP_OLD_THEME, theme).commit();
+        }
+        refreshUIIfNeed();
+        ThemeUtil.setTranslucentThemeBackground(findViewById(R.id.background));
+    }
+}package com.huanchengfly.tieba.post.activities;
+
+import android.content.Context;
+import android.content.Intent;
+import android.graphics.Bitmap;
+import android.os.Bundle;
+import android.os.Handler;
+import android.webkit.CookieManager;
+import android.webkit.WebView;
+
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.widget.Toolbar;
+
+import com.google.android.material.snackbar.Snackbar;
+import com.huanchengfly.tieba.post.R;
+import com.huanchengfly.tieba.post.fragments.WebViewFragment;
+import com.huanchengfly.tieba.post.interfaces.WebViewListener;
+import com.huanchengfly.tieba.post.utils.AccountUtil;
+import com.huanchengfly.tieba.post.utils.DialogUtil;
+import com.huanchengfly.tieba.post.utils.ThemeUtil;
+import com.huanchengfly.tieba.post.utils.Util;
+
+public class UpdateInfoActivity extends BaseActivity implements WebViewListener {
+    public static final int ACTION_UPDATE_LOGIN_INFO = 0;
+    private static final String EXTRA_ACTION = "action";
+    private static Handler handler = new Handler();
+    private Toolbar toolbar;
+    private int action;
+    private WebViewFragment mWebViewFragment;
+
+    public static Intent newIntent(Context context, int action) {
+        return new Intent(context, UpdateInfoActivity.class).putExtra(EXTRA_ACTION, action);
+    }
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_login);
+        ThemeUtil.setTranslucentThemeBackground(findViewById(R.id.background));
+        toolbar = (Toolbar) findViewById(R.id.toolbar);
+        action = getIntent().getIntExtra(EXTRA_ACTION, ACTION_UPDATE_LOGIN_INFO);
+        setSupportActionBar(toolbar);
+        ActionBar actionBar = getSupportActionBar();
+        if (actionBar != null) {
+            actionBar.setDisplayHomeAsUpEnabled(true);
+            if (action == ACTION_UPDATE_LOGIN_INFO) {
+                actionBar.setTitle(R.string.title_update_stoken);
+            } else {
+                finish();
+            }
+        }
+        if (savedInstanceState == null) {
+            mWebViewFragment = WebViewFragment.newInstance("https://wappass.baidu.com/passport?login&u=https%3A%2F%2Ftieba.baidu.com%2Findex%2Ftbwise%2Fmine", "UpdateInfoActivity", false);
+            getSupportFragmentManager().beginTransaction()
+                    .replace(R.id.main, mWebViewFragment, "WebViewFragment")
+                    .commit();
+        }
+    }
+
+    @Override
+    public void onPageFinished(WebView view, String url) {
+        if (action == ACTION_UPDATE_LOGIN_INFO) {
+            updateLoginInfo(url);
+        }
+    }
+
+    private void updateLoginInfo(String url) {
+        CookieManager cookieManager = CookieManager.getInstance();
+        String cookies = cookieManager.getCookie(url);
+        if (cookies != null && AccountUtil.updateLoginInfo(cookies)) {
+            Snackbar snackbar = Util.createSnackbar(mWebViewFragment.getWebView(), "更新成功，即将跳转", Snackbar.LENGTH_INDEFINITE);
+            snackbar.show();
+            handler.postDelayed(() -> {
+                snackbar.dismiss();
+                finish();
+            }, 1500);
+        } else {
+            DialogUtil.build(this)
+                    .setTitle("出现问题")
+                    .setMessage("看起来您还没有登录或登录已失效，请先登录")
+                    .setPositiveButton(R.string.button_sure_default, (dialog, which) -> {
+                        finish();
+                        startActivity(new Intent(this, LoginActivity.class));
+                    })
+                    .create()
+                    .show();
+        }
+    }
+
+    @Override
+    public void onPageStarted(WebView view, String url, Bitmap favicon) {
+    }
+}
+package com.huanchengfly.tieba.post.activities;
+
+import android.content.res.ColorStateList;
+import android.graphics.Color;
+import android.os.Bundle;
+import android.text.TextUtils;
+import android.view.Menu;
+import android.view.MenuItem;
+import android.view.View;
+import android.widget.ImageView;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.widget.Toolbar;
+import androidx.viewpager.widget.ViewPager;
+
+import com.google.android.material.appbar.AppBarLayout;
+import com.google.android.material.tabs.TabLayout;
+import com.huanchengfly.tieba.post.ui.theme.utils.ThemeUtils;
+import com.huanchengfly.tieba.post.api.TiebaApi;
+import com.huanchengfly.tieba.post.api.models.CommonResponse;
+import com.huanchengfly.tieba.post.api.models.ProfileBean;
+import com.huanchengfly.tieba.post.R;
+import com.huanchengfly.tieba.post.adapters.FragmentTabViewPagerAdapter;
+import com.huanchengfly.tieba.post.fragments.UserLikeForumFragment;
+import com.huanchengfly.tieba.post.fragments.UserPostFragment;
+import com.huanchengfly.tieba.post.models.PhotoViewBean;
+import com.huanchengfly.tieba.post.models.database.Account;
+import com.huanchengfly.tieba.post.models.database.Block;
+import com.huanchengfly.tieba.post.utils.AccountUtil;
+import com.huanchengfly.tieba.post.utils.ImageUtil;
+import com.huanchengfly.tieba.post.utils.ThemeUtil;
+import com.huanchengfly.tieba.post.widgets.theme.TintMaterialButton;
+
+import org.jetbrains.annotations.NotNull;
+
+import butterknife.BindView;
+import butterknife.OnClick;
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+
+import static com.huanchengfly.tieba.post.utils.Util.changeAlpha;
+
+public class UserActivity extends BaseActivity {
+    public static final String TAG = "UserActivity";
+    public static final String EXTRA_UID = "uid";
+    public static final String EXTRA_TAB = "tab";
+    public static final String EXTRA_AVATAR = "avatar";
+
+    public static final int TAB_THREAD = 0;
+    public static final int TAB_REPLY = 1;
+    public static final int TAB_LIKE_FORUM = 2;
+
+    @BindView(R.id.toolbar)
+    Toolbar toolbar;
+    @BindView(R.id.user_center_avatar)
+    ImageView avatarView;
+    @BindView(R.id.title_view)
+    TextView titleView;
+    @BindView(R.id.user_center_stat)
+    TextView statView;
+    @BindView(R.id.user_center_action_btn)
+    TintMaterialButton actionBtn;
+    @BindView(R.id.loading_view)
+    View loadingView;
+
+    private ProfileBean profileBean;
+
+    private String uid;
+    private int tab;
+
+    @Override
+    protected int getLayoutId() {
+        return R.layout.activity_user;
+    }
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        ThemeUtil.setTranslucentThemeBackground(findViewById(R.id.background));
+        uid = getIntent().getStringExtra(EXTRA_UID);
+        tab = getIntent().getIntExtra(EXTRA_TAB, TAB_THREAD);
+        String avatar = getIntent().getStringExtra(EXTRA_AVATAR);
+        if (uid == null) {
+            finish();
+            return;
+        }
+        FragmentTabViewPagerAdapter adapter = new FragmentTabViewPagerAdapter(getSupportFragmentManager());
+        ViewPager viewPager = (ViewPager) findViewById(R.id.user_center_vp);
+        TabLayout tabLayout = (TabLayout) findViewById(R.id.user_center_tab);
+        AppBarLayout appBarLayout = (AppBarLayout) findViewById(R.id.appbar);
+        actionBtn.setVisibility(View.GONE);
+        if (!TextUtils.isEmpty(avatar)) {
+            loadingView.setVisibility(View.GONE);
+            ImageUtil.load(avatarView, ImageUtil.LOAD_TYPE_AVATAR, avatar);
+            ImageUtil.initImageView(avatarView, new PhotoViewBean(avatar));
+        }
+        appBarLayout.addOnOffsetChangedListener((appBarLayout1, verticalOffset) -> {
+            toolbar.setBackgroundColor(changeAlpha(ThemeUtils.getColorByAttr(this, R.attr.colorToolbar), Math.abs(verticalOffset * 1.0f) / appBarLayout1.getTotalScrollRange()));
+            if (profileBean != null && profileBean.getUser() != null && Math.abs(verticalOffset) >= appBarLayout1.getTotalScrollRange()) {
+                toolbar.setTitle(profileBean.getUser().getNameShow());
+            } else {
+                toolbar.setTitle(null);
+            }
+        });
+        setSupportActionBar(toolbar);
+        ActionBar actionBar = getSupportActionBar();
+        if (actionBar != null) {
+            actionBar.setDisplayHomeAsUpEnabled(true);
+        }
+        viewPager.setAdapter(adapter);
+        viewPager.setOffscreenPageLimit(3);
+        tabLayout.setupWithViewPager(viewPager);
+        TiebaApi.getInstance().profile(uid).enqueue(new Callback<ProfileBean>() {
+            @Override
+            public void onResponse(@NotNull Call<ProfileBean> call, @NotNull Response<ProfileBean> response) {
+                ProfileBean data = response.body();
+                actionBtn.setVisibility(View.VISIBLE);
+                loadingView.setVisibility(View.GONE);
+                View dividerView = findViewById(R.id.user_center_divider);
+                if (ThemeUtils.getColorByAttr(UserActivity.this, R.attr.colorBg) == ThemeUtils.getColorByAttr(UserActivity.this, R.attr.colorToolbar)) {
+                    dividerView.setVisibility(View.VISIBLE);
+                }
+                if (ThemeUtils.getColorByAttr(UserActivity.this, R.attr.colorToolbar) == ThemeUtils.getColorByAttr(UserActivity.this, R.attr.colorAccent)) {
+                    actionBtn.setTextColor(ColorStateList.valueOf(Color.WHITE));
+                    actionBtn.setStrokeColor(ColorStateList.valueOf(Color.WHITE));
+                }
+                profileBean = data;
+                refreshHeader();
+                adapter.clear();
+                adapter.addFragment(UserPostFragment.newInstance(uid, true), "贴子 " + data.getUser().getThreadNum());
+                adapter.addFragment(UserPostFragment.newInstance(uid, false), "回复 " + data.getUser().getRepostNum());
+                adapter.addFragment(UserLikeForumFragment.newInstance(uid), "关注吧 " + data.getUser().getMyLikeNum());
+                viewPager.setCurrentItem(tab, false);
+            }
+
+            @Override
+            public void onFailure(@NotNull Call<ProfileBean> call, @NotNull Throwable t) {
+            }
+        });
+    }
+
+    public void refreshHeader() {
+        titleView.setText(profileBean.getUser().getNameShow());
+        statView.setText(getString(R.string.tip_stat, profileBean.getUser().getConcernNum(), profileBean.getUser().getFansNum()));
+        if (avatarView.getTag() == null) {
+            ImageUtil.load(avatarView, ImageUtil.LOAD_TYPE_AVATAR, "http://tb.himg.baidu.com/sys/portrait/item/" + profileBean.getUser().getPortrait());
+            ImageUtil.initImageView(avatarView, new PhotoViewBean("http://tb.himg.baidu.com/sys/portrait/item/" + profileBean.getUser().getPortrait()));
+        }
+        if (TextUtils.equals(AccountUtil.getUid(this), profileBean.getUser().getId())) {
+            actionBtn.setText(R.string.menu_edit_info);
+        } else {
+            if ("1".equals(profileBean.getUser().getHasConcerned())) {
+                actionBtn.setText(R.string.button_unfollow);
+            } else {
+                actionBtn.setText(R.string.button_follow);
+            }
+        }
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.menu_user_space, menu);
+        Account account = AccountUtil.getLoginInfo(this);
+        if (account != null && TextUtils.equals(account.getUid(), uid)) {
+            menu.findItem(R.id.menu_block).setVisible(false);
+            menu.findItem(R.id.menu_edit_info).setVisible(true);
+        } else {
+            menu.findItem(R.id.menu_block).setVisible(true);
+            menu.findItem(R.id.menu_edit_info).setVisible(false);
+        }
+        return super.onCreateOptionsMenu(menu);
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch (item.getItemId()) {
+            case R.id.menu_block_black:
+            case R.id.menu_block_white:
+                int category = item.getItemId() == R.id.menu_block_black ? Block.CATEGORY_BLACK_LIST : Block.CATEGORY_WHITE_LIST;
+                new Block()
+                        .setUid(profileBean.getUser().getId())
+                        .setUsername(profileBean.getUser().getName())
+                        .setType(Block.TYPE_USER)
+                        .setCategory(category)
+                        .saveAsync()
+                        .listen(success -> {
+                            if (success) {
+                                Toast.makeText(this, R.string.toast_add_success, Toast.LENGTH_SHORT).show();
+                            }
+                        });
+                return true;
+            case R.id.menu_edit_info:
+                startActivity(WebViewActivity.newIntent(this, getString(R.string.url_edit_info)));
+                return true;
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
+    @OnClick(R.id.user_center_action_btn)
+    public void onActionBtnClick(View view) {
+        if (TextUtils.equals(profileBean.getUser().getId(), AccountUtil.getUid(this))) {
+            startActivity(WebViewActivity.newIntent(this, getString(R.string.url_edit_info)));
+            return;
+        }
+        if ("1".equals(profileBean.getUser().getHasConcerned())) {
+            TiebaApi.getInstance().unfollow(profileBean.getUser().getPortrait(), AccountUtil.getLoginInfo(this).getTbs()).enqueue(new Callback<CommonResponse>() {
+                @Override
+                public void onResponse(@NotNull Call<CommonResponse> call, @NotNull Response<CommonResponse> response) {
+                    CommonResponse data = response.body();
+                    Toast.makeText(UserActivity.this, data.getErrorMsg(), Toast.LENGTH_SHORT).show();
+                    profileBean.getUser().setHasConcerned("0");
+                    refreshHeader();
+                }
+
+                @Override
+                public void onFailure(@NotNull Call<CommonResponse> call, @NotNull Throwable t) {
+                    Toast.makeText(UserActivity.this, t.getMessage(), Toast.LENGTH_SHORT).show();
+                }
+            });
+        } else {
+            TiebaApi.getInstance().follow(profileBean.getUser().getPortrait(), AccountUtil.getLoginInfo(this).getTbs()).enqueue(new Callback<CommonResponse>() {
+                @Override
+                public void onResponse(@NotNull Call<CommonResponse> call, @NotNull Response<CommonResponse> response) {
+                    CommonResponse data = response.body();
+                    Toast.makeText(UserActivity.this, data.getErrorMsg(), Toast.LENGTH_SHORT).show();
+                    profileBean.getUser().setHasConcerned("1");
+                    refreshHeader();
+                }
+
+                @Override
+                public void onFailure(@NotNull Call<CommonResponse> call, @NotNull Throwable t) {
+                    Toast.makeText(UserActivity.this, t.getMessage(), Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+    }
+}package com.huanchengfly.tieba.post.activities;
+
+import android.os.Bundle;
+
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.widget.Toolbar;
+
+import com.huanchengfly.tieba.post.R;
+import com.huanchengfly.tieba.post.utils.ThemeUtil;
+
+public class UserCollectActivity extends BaseActivity {
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_user_collect);
+        ThemeUtil.setTranslucentThemeBackground(findViewById(R.id.background));
+        Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+        ActionBar actionBar = getSupportActionBar();
+        if (actionBar != null) {
+            actionBar.setDisplayHomeAsUpEnabled(true);
+            actionBar.setTitle(R.string.title_my_collect);
+        }
+    }
+}
+package com.huanchengfly.tieba.post.activities;
+
+import android.content.Context;
+import android.content.Intent;
+import android.net.Uri;
+import android.os.Bundle;
+import android.view.Menu;
+import android.view.MenuItem;
+import android.webkit.WebView;
+
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.widget.Toolbar;
+
+import com.huanchengfly.tieba.post.R;
+import com.huanchengfly.tieba.post.fragments.WebViewFragment;
+import com.huanchengfly.tieba.post.interfaces.OnReceivedTitleListener;
+import com.huanchengfly.tieba.post.utils.ThemeUtil;
+import com.huanchengfly.tieba.post.utils.TiebaUtil;
+
+public class WebViewActivity extends BaseActivity implements OnReceivedTitleListener {
+    public static final String TAG = WebViewActivity.class.getSimpleName();
+
+    public static final String DOMAIN_SAPI = "wappass.baidu.com";
+    public static final String EXTRA_URL = "url";
+    private static final String DOMAIN_TIEBA = "tieba.baidu.com";
+
+    private WebViewFragment mWebViewFragment;
+    private Toolbar toolbar;
+    private String mUrl;
+
+    public static Intent newIntent(Context context, String url) {
+        return new Intent(context, WebViewActivity.class).putExtra(EXTRA_URL, url);
+    }
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_webview);
+        ThemeUtil.setTranslucentThemeBackground(findViewById(R.id.background));
+        toolbar = (Toolbar) findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+        ActionBar actionBar = getSupportActionBar();
+        if (actionBar != null) actionBar.setDisplayHomeAsUpEnabled(true);
+        Intent intent = getIntent();
+        mUrl = intent.getStringExtra(EXTRA_URL);
+        mWebViewFragment = WebViewFragment.newInstance(mUrl, TAG, null, false, true, mUrl.contains(DOMAIN_SAPI));
+        getSupportFragmentManager().beginTransaction()
+                .replace(R.id.main, mWebViewFragment, TAG)
+                .commit();
+    }
+
+    @Override
+    public void setTitle(String newTitle) {
+        toolbar.setTitle(newTitle);
+    }
+
+    @Override
+    public void setSubTitle(String newSubTitle) {
+        toolbar.setSubtitle(newSubTitle);
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch (item.getItemId()) {
+            case R.id.menu_open_in_browser:
+                Uri uri = Uri.parse(mWebViewFragment.getWebView().getUrl() == null ?
+                        mUrl :
+                        mWebViewFragment.getWebView().getUrl());
+                Intent intent = new Intent(Intent.ACTION_VIEW, uri);
+                startActivity(intent);
+                break;
+            case R.id.menu_copy_link:
+                TiebaUtil.copyText(this, mWebViewFragment.getWebView().getUrl());
+                break;
+            case R.id.menu_refresh:
+                mWebViewFragment.getWebView().reload();
+                break;
+            case R.id.menu_share:
+                TiebaUtil.shareText(this, mWebViewFragment.getWebView().getUrl());
+                break;
+            case R.id.menu_exit:
+                finish();
+                break;
+            default:
+                break;
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.menu_webview_toolbar, menu);
+        return super.onCreateOptionsMenu(menu);
+    }
+
+    @Override
+    public void onReceivedTitle(WebView view, String title, String url) {
+        setTitle(title);
+        Uri uri = Uri.parse(url);
+        String host = uri.getHost();
+        if (host != null && host.contains(DOMAIN_TIEBA)) {
+            setSubTitle(null);
+        } else {
+            setSubTitle(host);
+        }
+    }
+}

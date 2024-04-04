@@ -1,0 +1,2769 @@
+package com.huanchengfly.tieba.post.activities
+
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.Bundle
+import android.view.Menu
+import android.view.MenuItem
+import android.view.View
+import android.widget.Toast
+import androidx.appcompat.widget.Toolbar
+import androidx.recyclerview.widget.RecyclerView
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+import butterknife.BindView
+import butterknife.OnClick
+import com.huanchengfly.tieba.post.R
+import com.huanchengfly.tieba.post.adapters.RecyclerFloorAdapter
+import com.huanchengfly.tieba.post.api.TiebaApi
+import com.huanchengfly.tieba.post.api.models.SubFloorListBean
+import com.huanchengfly.tieba.post.components.MyLinearLayoutManager
+import com.huanchengfly.tieba.post.components.dividers.ThreadDivider
+import com.huanchengfly.tieba.post.models.ReplyInfoBean
+import com.huanchengfly.tieba.post.utils.AccountUtil
+import com.huanchengfly.tieba.post.utils.NavigationHelper
+import com.huanchengfly.tieba.post.utils.ThemeUtil
+import retrofit2.Call
+import retrofit2.Callback
+import retrofit2.Response
+
+class FloorActivity : BaseActivity() {
+    @BindView(R.id.toolbar)
+    lateinit var toolbar: Toolbar
+    @BindView(R.id.floor_refresh_view)
+    lateinit var refreshLayout: SwipeRefreshLayout
+    @BindView(R.id.floor_recycler_view)
+    lateinit var recyclerView: RecyclerView
+    private var dataBean: SubFloorListBean? = null
+    private var recyclerViewAdapter: RecyclerFloorAdapter? = null
+    private var navigationHelper: NavigationHelper? = null
+    private var tid: String? = null
+    private var pid: String? = null
+    private var spid: String? = null
+    private var hasMore = false
+    private var pn = 1
+    private val replyReceiver: BroadcastReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            val action = intent.action
+            if (action != null && action == ThreadActivity.ACTION_REPLY_SUCCESS) {
+                val pid = intent.getStringExtra("pid")
+                if (pid == this@FloorActivity.pid) {
+                    refresh()
+                }
+            }
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        val filter = IntentFilter()
+        filter.addAction(ThreadActivity.ACTION_REPLY_SUCCESS)
+        registerReceiver(replyReceiver, filter)
+    }
+
+    override fun onStop() {
+        super.onStop()
+        unregisterReceiver(replyReceiver)
+    }
+
+    override fun getLayoutId(): Int {
+        return R.layout.activity_floor
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        ThemeUtil.setTranslucentThemeBackground(findViewById(R.id.background))
+        navigationHelper = NavigationHelper.newInstance(this)
+        initView()
+        if (savedInstanceState == null) {
+            initData()
+        }
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.menu_floor_toolbar, menu)
+        return super.onCreateOptionsMenu(menu)
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        when (item.itemId) {
+            R.id.menu_to_thread -> {
+                if (dataBean != null) {
+                    navigationHelper!!.navigationByData(NavigationHelper.ACTION_THREAD, mapOf<String, String>(
+                            "tid" to tid!!,
+                            "pid" to pid!!
+                    ))
+                }
+                return true
+            }
+        }
+        return super.onOptionsItemSelected(item)
+    }
+
+    private fun initData() {
+        val intent = intent
+        tid = intent.getStringExtra("tid")
+        pid = intent.getStringExtra("pid")
+        spid = intent.getStringExtra("spid")
+        if (tid != null && (pid != null || spid != null)) {
+            hasMore = true
+            refresh()
+        }
+    }
+
+    private fun initView() {
+        setSupportActionBar(toolbar)
+        supportActionBar?.setTitle(R.string.title_floor)
+        supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        recyclerViewAdapter = RecyclerFloorAdapter(this).apply {
+            openAutoLoadMore()
+            setLoadingView(R.layout.layout_footer_loading)
+            setLoadEndView(R.layout.layout_footer_loadend)
+            setLoadFailedView(R.layout.layout_footer_load_failed)
+            setOnLoadMoreListener { isReload: Boolean ->
+                if (isReload) {
+                    refresh()
+                } else {
+                    loadMore()
+                }
+            }
+        }
+        recyclerView.apply {
+            layoutManager = MyLinearLayoutManager(this@FloorActivity)
+            adapter = recyclerViewAdapter
+            addItemDecoration(ThreadDivider(this@FloorActivity))
+        }
+        refreshLayout.apply {
+            ThemeUtil.setThemeForSwipeRefreshLayout(this)
+            setOnRefreshListener { refresh() }
+        }
+    }
+
+    @OnClick(R.id.floor_reply_bar)
+    fun onReplyBarClick(view: View) {
+        if (dataBean == null) {
+            return
+        }
+        val floor = dataBean!!.post!!.floor.toInt()
+        val pn = floor - floor % 30
+        startActivity(Intent(this, ReplyActivity::class.java)
+                .putExtra("data",
+                        ReplyInfoBean(dataBean!!.thread!!.id,
+                                dataBean!!.forum!!.id,
+                                dataBean!!.forum!!.name,
+                                dataBean!!.anti!!.tbs,
+                                dataBean!!.post!!.id,
+                                dataBean!!.post!!.floor,
+                                dataBean!!.post!!.author.nameShow,
+                                AccountUtil.getLoginInfo(this)!!.nameShow).setPn(pn.toString()).toString()))
+    }
+
+    private fun refresh() {
+        refreshLayout.isRefreshing = true
+        TiebaApi.getInstance()
+                .floor(tid!!, pn, pid, spid)
+                .enqueue(object : Callback<SubFloorListBean> {
+                    override fun onFailure(call: Call<SubFloorListBean>, t: Throwable) {
+                        Toast.makeText(this@FloorActivity, t.message, Toast.LENGTH_SHORT).show()
+                        recyclerViewAdapter!!.loadFailed()
+                        refreshLayout.isRefreshing = false
+                    }
+
+                    override fun onResponse(call: Call<SubFloorListBean>, response: Response<SubFloorListBean>) {
+                        val subFloorListBean = response.body() ?: return
+                        dataBean = subFloorListBean
+                        recyclerViewAdapter!!.setData(subFloorListBean)
+                        pid = subFloorListBean.post!!.id
+                        spid = null
+                        hasMore = subFloorListBean.page!!.currentPage.toInt() < subFloorListBean.page.totalPage.toInt()
+                        if (!hasMore) {
+                            recyclerViewAdapter!!.loadEnd()
+                        }
+                        toolbar.title = getString(R.string.title_floor_loaded, subFloorListBean.post.floor)
+                        refreshLayout.isRefreshing = false
+                    }
+                })
+    }
+
+    private fun loadMore() {
+        if (!hasMore) return
+        TiebaApi.getInstance()
+                .floor(tid!!, pn, pid, spid)
+                .enqueue(object : Callback<SubFloorListBean> {
+                    override fun onFailure(call: Call<SubFloorListBean>, t: Throwable) {
+                        recyclerViewAdapter!!.loadFailed()
+                    }
+
+                    override fun onResponse(call: Call<SubFloorListBean>, response: Response<SubFloorListBean>) {
+                        val subFloorListBean = response.body() ?: return
+                        dataBean = subFloorListBean
+                        recyclerViewAdapter!!.addData(subFloorListBean)
+                        pid = subFloorListBean.post!!.id
+                        spid = null
+                        hasMore = subFloorListBean.page!!.currentPage.toInt() < subFloorListBean.page.totalPage.toInt()
+                        if (!hasMore) {
+                            recyclerViewAdapter!!.loadEnd()
+                        }
+                        pn += 1
+                    }
+                })
+    }
+}@file:Suppress("DEPRECATION")
+
+package com.huanchengfly.tieba.post.activities
+
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.content.Intent
+import android.content.res.ColorStateList
+import android.graphics.Bitmap
+import android.net.Uri
+import android.os.Build
+import android.os.Bundle
+import android.text.TextUtils
+import android.view.Menu
+import android.view.MenuItem
+import android.view.View
+import android.view.ViewGroup
+import android.widget.*
+import androidx.appcompat.widget.ListPopupWindow
+import androidx.core.content.pm.ShortcutInfoCompat
+import androidx.core.content.pm.ShortcutManagerCompat
+import androidx.core.graphics.drawable.IconCompat
+import androidx.fragment.app.Fragment
+import butterknife.BindView
+import cn.jzvd.Jzvd
+import com.bumptech.glide.Glide
+import com.bumptech.glide.request.RequestOptions
+import com.bumptech.glide.request.target.SimpleTarget
+import com.bumptech.glide.request.transition.Transition
+import com.google.android.material.appbar.AppBarLayout
+import com.google.android.material.appbar.AppBarLayout.OnOffsetChangedListener
+import com.google.android.material.appbar.CollapsingToolbarLayout
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.floatingactionbutton.FloatingActionButton
+import com.google.android.material.snackbar.Snackbar
+import com.google.android.material.tabs.TabLayout
+import com.google.android.material.tabs.TabLayout.OnTabSelectedListener
+import com.huanchengfly.tieba.post.R
+import com.huanchengfly.tieba.post.adapters.FragmentTabViewPagerAdapter
+import com.huanchengfly.tieba.post.api.ForumSortType
+import com.huanchengfly.tieba.post.api.TiebaApi
+import com.huanchengfly.tieba.post.api.models.CommonResponse
+import com.huanchengfly.tieba.post.api.models.ForumPageBean
+import com.huanchengfly.tieba.post.api.models.LikeForumResultBean
+import com.huanchengfly.tieba.post.api.models.SignResultBean
+import com.huanchengfly.tieba.post.fragments.ForumFragment
+import com.huanchengfly.tieba.post.fragments.ForumFragment.OnRefreshedListener
+import com.huanchengfly.tieba.post.fragments.ForumInfoFragment
+import com.huanchengfly.tieba.post.interfaces.Refreshable
+import com.huanchengfly.tieba.post.interfaces.ScrollTopable
+import com.huanchengfly.tieba.post.models.PhotoViewBean
+import com.huanchengfly.tieba.post.models.database.History
+import com.huanchengfly.tieba.post.toDp
+import com.huanchengfly.tieba.post.ui.theme.utils.ThemeUtils
+import com.huanchengfly.tieba.post.utils.*
+import com.huanchengfly.tieba.post.utils.preload.PreloadUtil
+import com.huanchengfly.tieba.post.widgets.MyViewPager
+import com.huanchengfly.tieba.post.widgets.theme.TintProgressBar
+import com.huanchengfly.tieba.post.widgets.theme.TintToolbar
+import com.lapism.searchview.widget.SearchView
+import retrofit2.Call
+import retrofit2.Callback
+import retrofit2.Response
+import java.util.*
+import kotlin.math.abs
+
+class ForumActivity : BaseActivity(), View.OnClickListener, OnRefreshedListener {
+    private var mSortType = ForumSortType.REPLY_TIME
+    private var forumName: String? = null
+    private var firstLoaded = false
+    private var animated = false
+
+    @BindView(R.id.toolbar)
+    lateinit var toolbar: TintToolbar
+
+    @BindView(R.id.forum_view_pager)
+    lateinit var myViewPager: MyViewPager
+    private var mAdapter: FragmentTabViewPagerAdapter? = null
+    private var mDataBean: ForumPageBean? = null
+
+    @BindView(R.id.fab)
+    lateinit var fab: FloatingActionButton
+    private var historyHelper: HistoryHelper? = null
+
+    @BindView(R.id.toolbar_search_view)
+    lateinit var searchView: SearchView
+
+    @BindView(R.id.loading_view)
+    lateinit var loadingView: View
+
+    @BindView(R.id.toolbar_btn_right)
+    lateinit var toolbarEndBtn: MaterialButton
+
+    @BindView(R.id.header_view_parent)
+    lateinit var headerView: View
+
+    @BindView(R.id.forum_header_name)
+    lateinit var headerNameTextView: TextView
+
+    @BindView(R.id.forum_header_tip)
+    lateinit var tipTextView: TextView
+
+    @BindView(R.id.forum_header_avatar)
+    lateinit var avatarView: ImageView
+
+    @BindView(R.id.forum_header_button)
+    lateinit var button: MaterialButton
+
+    @BindView(R.id.forum_tab)
+    lateinit var headerTabView: TabLayout
+
+    @BindView(R.id.forum_header_progress)
+    lateinit var progressBar: ProgressBar
+
+    @BindView(R.id.appbar)
+    lateinit var appbar: AppBarLayout
+
+    @BindView(R.id.forum_sort_text)
+    lateinit var sortTypeText: TextView
+
+    @BindView(R.id.forum_tab_holder)
+    lateinit var tabHolder: View
+
+    override fun getLayoutId(): Int {
+        return R.layout.activity_forum
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        ThemeUtil.setTranslucentThemeBackground(findViewById(R.id.background))
+        historyHelper = HistoryHelper(this)
+        animated = false
+        val intent = intent
+        val title: String
+        if (intent.getBooleanExtra("jumpByUrl", false)) {
+            val url = intent.getStringExtra("url")
+            val uri = Uri.parse(url)
+            forumName = uri.getQueryParameter("kw")
+            title = getString(R.string.title_forum, forumName)
+        } else {
+            forumName = intent.getStringExtra(EXTRA_FORUM_NAME)
+            title = getString(R.string.title_forum, forumName)
+        }
+        if (forumName == null) {
+            finish()
+            return
+        }
+        initView()
+        setTitle(title)
+        initData()
+    }
+
+    private fun getSortType(): ForumSortType {
+        val defaultSortType = appPreferences.defaultSortType!!.toInt()
+        return ForumSortType.valueOf(SharedPreferencesUtil.get(this, SharedPreferencesUtil.SP_SETTINGS)
+                .getInt(forumName + "_sort_type", defaultSortType))
+    }
+
+    private fun setSortType(sortType: ForumSortType) {
+        this.mSortType = sortType
+        for (fragment in mAdapter!!.fragments) {
+            if (fragment is ForumFragment) {
+                fragment.setSortType(sortType)
+            }
+        }
+        refresh()
+        SharedPreferencesUtil.get(this, SharedPreferencesUtil.SP_SETTINGS)
+                .edit()
+                .putInt(forumName + "_sort_type", sortType.value)
+                .apply()
+    }
+
+    private fun refresh() {
+        refreshHeaderView()
+        if (currentFragment is Refreshable) {
+            (currentFragment as Refreshable).onRefresh()
+        }
+    }
+
+    private fun initData() {
+        firstLoaded = true
+        mSortType = getSortType()
+        /*
+        if (baName != null) {
+            refresh();
+        }
+        */
+    }
+
+    private fun initView() {
+        findViewById(R.id.forum_sort).setOnClickListener(this)
+        val collapsingToolbarLayout = findViewById(R.id.collapsing_toolbar) as CollapsingToolbarLayout
+        collapsingToolbarLayout.setContentScrimColor(ThemeUtils.getColorByAttr(this, R.attr.colorToolbar))
+        appbar.addOnOffsetChangedListener(OnOffsetChangedListener { appBarLayout: AppBarLayout, verticalOffset: Int ->
+            if (animated && ThemeUtil.THEME_TRANSLUCENT == ThemeUtil.getTheme(this)) {
+                val actionBarSize = Util.getDimenByAttr(this, R.attr.actionBarSize, 0)
+                if (abs(verticalOffset) > actionBarSize / 2) {
+                    AnimUtil.alphaOut(headerView).setListener(object : AnimatorListenerAdapter() {
+                        override fun onAnimationEnd(animation: Animator) {
+                            headerView.visibility = View.INVISIBLE
+                        }
+                    }).start()
+                } else {
+                    AnimUtil.alphaIn(headerView).start()
+                }
+            }
+            if (mDataBean != null && mDataBean!!.forum != null && abs(verticalOffset) >= appBarLayout.totalScrollRange) {
+                tabHolder.setBackgroundColor(ThemeUtils.getColorByAttr(this, R.attr.colorBg))
+            } else {
+                tabHolder.setBackgroundResource(R.drawable.bg_round)
+            }
+            val titleVisible = mDataBean != null && forumName != null && abs(verticalOffset) >= headerView.height / 2
+            title = if (titleVisible) getString(R.string.title_forum, forumName) else null
+            toolbarEndBtn.visibility = if (titleVisible) View.VISIBLE else View.GONE
+        })
+        mAdapter = FragmentTabViewPagerAdapter(supportFragmentManager).apply {
+            addFragment(ForumInfoFragment.newInstance(forumName), getString(R.string.tab_forum_info))
+            addFragment(
+                    if (PreloadUtil.isPreloading(this@ForumActivity))
+                        ForumFragment.newInstance(forumName, false, getSortType(), PreloadUtil.getPreloadId(this@ForumActivity))
+                    else
+                        ForumFragment.newInstance(forumName, false, getSortType()),
+                    getString(R.string.tab_forum_1)
+            )
+            addFragment(ForumFragment.newInstance(forumName, true, getSortType()), getString(R.string.tab_forum_good))
+        }
+        myViewPager.apply {
+            adapter = mAdapter
+            offscreenPageLimit = 2
+            setCurrentItem(1, false)
+        }
+        headerTabView.apply {
+            setupWithViewPager(myViewPager)
+            addOnTabSelectedListener(object : OnTabSelectedListener {
+                override fun onTabSelected(tab: TabLayout.Tab) {}
+                override fun onTabUnselected(tab: TabLayout.Tab) {}
+                override fun onTabReselected(tab: TabLayout.Tab) {
+                    refresh()
+                }
+            })
+            getTabAt(0)!!.setText(null).setIcon(R.drawable.ic_round_info)
+        }
+        refreshHeaderView()
+        fab.hide()
+        fab.supportImageTintList = ColorStateList.valueOf(resources.getColor(R.color.white))
+        myViewPager.visibility = View.INVISIBLE
+        searchView.setHint(getString(R.string.hint_search_in_ba, forumName))
+        setSupportActionBar(toolbar)
+        val actionBar = supportActionBar
+        actionBar?.setDisplayHomeAsUpEnabled(true)
+        button.setOnClickListener(this)
+        toolbar.setOnClickListener(this)
+        toolbarEndBtn.setOnClickListener(this)
+        fab.setOnClickListener(this)
+    }
+
+    override fun setTitle(newTitle: String) {
+        toolbar.title = newTitle
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        when (item.itemId) {
+            R.id.menu_unfollow -> {
+                if (mDataBean != null) {
+                    DialogUtil.build(this@ForumActivity)
+                            .setTitle(R.string.title_dialog_unfollow)
+                            .setNegativeButton(R.string.button_cancel, null)
+                            .setPositiveButton(R.string.button_sure_default) { _, _ ->
+                                TiebaApi.getInstance().unlikeForum(mDataBean!!.forum?.id!!, mDataBean!!.forum?.name!!, mDataBean!!.anti?.tbs!!).enqueue(object : Callback<CommonResponse> {
+                                    override fun onFailure(call: Call<CommonResponse>, t: Throwable) {
+                                        Util.createSnackbar(myViewPager, getString(R.string.toast_unlike_failed, t.message), Snackbar.LENGTH_SHORT).show()
+                                    }
+
+                                    override fun onResponse(call: Call<CommonResponse>, response: Response<CommonResponse>) {
+                                        Util.createSnackbar(myViewPager, R.string.toast_unlike_success, Snackbar.LENGTH_SHORT).show()
+                                        refresh()
+                                    }
+                                })
+                            }
+                            .create()
+                            .show()
+                }
+            }
+            R.id.menu_share -> TiebaUtil.shareText(this, "https://tieba.baidu.com/f?kw=$forumName", getString(R.string.title_forum, forumName))
+            R.id.menu_search -> startActivity(Intent(this, SearchPostActivity::class.java).putExtra(SearchPostActivity.PARAM_FORUM, forumName))
+            R.id.menu_refresh -> refresh()
+            R.id.menu_send_to_desktop -> if (ShortcutManagerCompat.isRequestPinShortcutSupported(this)) {
+                if (mDataBean != null) {
+                    Glide.with(this)
+                            .asBitmap()
+                            .apply(RequestOptions.circleCropTransform())
+                            .load(mDataBean!!.forum?.avatar)
+                            .into(object : SimpleTarget<Bitmap>() {
+                                override fun onResourceReady(resource: Bitmap, transition: Transition<in Bitmap>?) {
+                                    val shortcutInfoIntent = Intent(this@ForumActivity, ForumActivity::class.java)
+                                            .setAction(Intent.ACTION_VIEW)
+                                            .putExtra(EXTRA_FORUM_NAME, mDataBean!!.forum?.name)
+                                    val shortcutInfoCompat = ShortcutInfoCompat.Builder(this@ForumActivity, mDataBean!!.forum?.id!!)
+                                            .setIntent(shortcutInfoIntent)
+                                            .setShortLabel(mDataBean!!.forum?.name + "吧")
+                                            .setIcon(IconCompat.createWithBitmap(resource))
+                                            .build()
+                                    ShortcutManagerCompat.requestPinShortcut(this@ForumActivity, shortcutInfoCompat, null)
+                                    Util.createSnackbar(myViewPager, R.string.toast_send_to_desktop_success, Snackbar.LENGTH_SHORT).show()
+                                }
+                            })
+                } else {
+                    Util.createSnackbar(myViewPager, getString(R.string.toast_send_to_desktop_failed, "获取吧信息失败"), Snackbar.LENGTH_SHORT).show()
+                }
+            } else {
+                Util.createSnackbar(myViewPager, getString(R.string.toast_send_to_desktop_failed, "启动器不支持创建快捷方式"), Snackbar.LENGTH_SHORT).show()
+            }
+            R.id.menu_exit -> finish()
+            else -> {
+            }
+        }
+        return super.onOptionsItemSelected(item)
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.menu_ba_toolbar, menu)
+        return super.onCreateOptionsMenu(menu)
+    }
+
+    override fun onClick(v: View) {
+        when (v.id) {
+            R.id.forum_sort -> {
+                val sorts: MutableList<String> = ArrayList()
+                sorts.add(getString(R.string.title_sort_by_reply))
+                sorts.add(getString(R.string.title_sort_by_send))
+                sorts.add(getString(R.string.title_sort_by_like_user))
+                val listPopupWindow = ListPopupWindow(this)
+                PopupUtil.replaceBackground(listPopupWindow)
+                listPopupWindow.anchorView = v
+                val width = v.width + 36.toDp()
+                listPopupWindow.width = width
+                listPopupWindow.height = ViewGroup.LayoutParams.WRAP_CONTENT
+                val arrayAdapter: ArrayAdapter<*> = ArrayAdapter(this, R.layout.item_list, R.id.item_title, sorts)
+                listPopupWindow.setAdapter(arrayAdapter)
+                listPopupWindow.setOnItemClickListener { _, _, position: Int, _ ->
+                    listPopupWindow.dismiss()
+                    setSortType(ForumSortType.valueOf(position))
+                }
+                listPopupWindow.show()
+                v.tag = listPopupWindow
+            }
+            R.id.fab -> {
+                if (mDataBean == null) {
+                    return
+                }
+                if ("0" != mDataBean!!.anti?.ifPost) {
+                    NavigationHelper.newInstance(this).navigationByData(NavigationHelper.ACTION_THREAD_POST, forumName)
+                } else {
+                    if (!TextUtils.isEmpty(mDataBean!!.anti?.forbidInfo)) {
+                        Toast.makeText(this, mDataBean!!.anti?.forbidInfo, Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+            R.id.toolbar -> scrollToTop()
+            R.id.forum_header_button, R.id.toolbar_btn_right -> if (mDataBean != null) {
+                if ("1" == mDataBean!!.forum?.isLike) {
+                    if ("0" == mDataBean!!.forum?.signInInfo?.userInfo?.isSignIn) {
+                        TiebaApi.getInstance().sign(mDataBean!!.forum?.name!!, mDataBean!!.anti?.tbs!!).enqueue(object : Callback<SignResultBean> {
+                            override fun onFailure(call: Call<SignResultBean>, t: Throwable) {
+                                Util.createSnackbar(myViewPager, getString(R.string.toast_sign_failed, t.message), Snackbar.LENGTH_SHORT).show()
+                            }
+
+                            override fun onResponse(call: Call<SignResultBean>, response: Response<SignResultBean>) {
+                                val signResultBean = response.body()!!
+                                if (signResultBean.userInfo != null) {
+                                    mDataBean!!.forum?.signInInfo?.userInfo?.isSignIn = "1"
+                                    Util.createSnackbar(myViewPager, getString(R.string.toast_sign_success, signResultBean.userInfo.signBonusPoint, signResultBean.userInfo.userSignRank), Snackbar.LENGTH_SHORT).show()
+                                    refreshHeaderView()
+                                    refreshForumInfo()
+                                }
+                            }
+                        })
+                    }
+                } else {
+                    TiebaApi.getInstance().likeForum(mDataBean!!.forum?.id!!, mDataBean!!.forum?.name!!, mDataBean!!.anti?.tbs!!).enqueue(object : Callback<LikeForumResultBean> {
+                        override fun onFailure(call: Call<LikeForumResultBean>, t: Throwable) {
+                            Toast.makeText(this@ForumActivity, getString(R.string.toast_like_failed, t.message), Toast.LENGTH_SHORT).show()
+                        }
+
+                        override fun onResponse(call: Call<LikeForumResultBean>, response: Response<LikeForumResultBean>) {
+                            mDataBean!!.forum?.isLike = "1"
+                            Toast.makeText(this@ForumActivity, getString(R.string.toast_like_success, response.body()!!.info?.memberSum), Toast.LENGTH_SHORT).show()
+                            refreshHeaderView()
+                            refreshForumInfo()
+                        }
+                    })
+                }
+            }
+        }
+    }
+
+    private fun refreshHeaderView() {
+        if (mDataBean != null) {
+            headerView.visibility = View.VISIBLE
+            if (avatarView.tag == null) {
+                ImageUtil.load(avatarView, ImageUtil.LOAD_TYPE_AVATAR, mDataBean!!.forum?.avatar)
+                ImageUtil.initImageView(avatarView, PhotoViewBean(mDataBean!!.forum?.avatar, false))
+            }
+            (progressBar as TintProgressBar?)!!.setProgressBackgroundTintResId(if (ThemeUtils.getColorByAttr(this, R.attr.colorToolbar) == ThemeUtils.getColorByAttr(this, R.attr.colorBg)) R.color.default_color_divider else R.color.default_color_toolbar_item_secondary)
+            progressBar.visibility = if ("1" == mDataBean!!.forum?.isLike) View.VISIBLE else View.GONE
+            try {
+                progressBar.max = Integer.valueOf(mDataBean!!.forum?.levelUpScore!!)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    progressBar.setProgress(Integer.valueOf(mDataBean!!.forum?.curScore!!), true)
+                } else {
+                    progressBar.progress = Integer.valueOf(mDataBean!!.forum?.curScore!!)
+                }
+            } catch (ignored: Exception) {
+            }
+            headerNameTextView.text = getString(R.string.tip_forum_name, mDataBean!!.forum?.name)
+            if ("1" == mDataBean!!.forum?.isLike) {
+                if ("0" == mDataBean!!.forum?.signInInfo?.userInfo?.isSignIn) {
+                    button.setText(R.string.button_sign_in)
+                    button.isEnabled = true
+                    toolbarEndBtn.setText(R.string.button_sign_in)
+                    toolbarEndBtn.isEnabled = true
+                } else {
+                    button.setText(R.string.button_signed)
+                    button.isEnabled = false
+                    toolbarEndBtn.setText(R.string.button_signed)
+                    toolbarEndBtn.isEnabled = false
+                }
+                tipTextView.text = getString(R.string.tip_forum_header_liked, mDataBean!!.forum?.userLevel, mDataBean!!.forum?.levelName)
+            } else {
+                button.setText(R.string.button_like)
+                button.isEnabled = true
+                toolbarEndBtn.setText(R.string.button_like)
+                toolbarEndBtn.isEnabled = true
+                tipTextView.text = mDataBean!!.forum?.slogan
+            }
+            when (mSortType) {
+                ForumSortType.REPLY_TIME -> sortTypeText.setText(R.string.title_sort_by_reply)
+                ForumSortType.SEND_TIME -> sortTypeText.setText(R.string.title_sort_by_send)
+                ForumSortType.ONLY_FOLLOWED -> sortTypeText.setText(R.string.title_sort_by_like_user)
+            }
+        } else {
+            headerView.visibility = View.INVISIBLE
+        }
+    }
+
+    private val currentFragment: Fragment
+        get() = mAdapter!!.getItem(headerTabView.selectedTabPosition)
+
+    private fun scrollToTop() {
+        if (currentFragment is ScrollTopable) {
+            (currentFragment as ScrollTopable).scrollToTop()
+        }
+    }
+
+    private fun refreshForumInfo() {
+        TiebaApi.getInstance().forumPage(forumName!!, 1).enqueue(object : Callback<ForumPageBean> {
+            override fun onFailure(call: Call<ForumPageBean>, t: Throwable) {}
+
+            override fun onResponse(call: Call<ForumPageBean>, response: Response<ForumPageBean>) {
+                val forumPageBean = response.body()!!
+                mDataBean!!.setForum(forumPageBean.forum)
+                mDataBean!!.setAnti(forumPageBean.anti)
+                refreshHeaderView()
+            }
+
+        })
+    }
+
+    override fun onBackPressed() {
+        if (searchView.isOpen) {
+            searchView.close()
+        } else {
+            if (Jzvd.backPress()) {
+                return
+            }
+            super.onBackPressed()
+        }
+    }
+
+    override fun onSuccess(forumPageBean: ForumPageBean) {
+        this.mDataBean = forumPageBean
+        forumName = forumPageBean.forum?.name
+        loadingView.visibility = View.GONE
+        refreshHeaderView()
+        if (!animated) {
+            animated = true
+            AnimUtil.alphaIn(myViewPager).start()
+            AnimUtil.alphaIn(tabHolder).start()
+            if (fab.isOrWillBeHidden) {
+                fab.show()
+            }
+        }
+        if (firstLoaded) {
+            firstLoaded = false
+            historyHelper!!.writeHistory(History()
+                    .setTitle(getString(R.string.title_forum, forumName))
+                    .setTimestamp(System.currentTimeMillis())
+                    .setAvatar(forumPageBean.forum?.avatar)
+                    .setType(HistoryHelper.TYPE_BA)
+                    .setData(forumName))
+        }
+    }
+
+    override fun onFailure(errorCode: Int, errorMsg: String?) {
+        refreshHeaderView()
+    }
+
+    companion object {
+        private const val TAG = "ForumActivity"
+        const val EXTRA_FORUM_NAME = "forum_name"
+    }
+}package com.huanchengfly.tieba.post.activities
+
+import android.annotation.SuppressLint
+import android.app.Activity
+import android.app.job.JobInfo
+import android.app.job.JobScheduler
+import android.content.*
+import android.graphics.Typeface
+import android.os.Bundle
+import android.os.Handler
+import android.text.SpannableStringBuilder
+import android.text.Spanned
+import android.text.TextUtils
+import android.text.style.ForegroundColorSpan
+import android.text.style.StyleSpan
+import android.util.Log
+import android.view.LayoutInflater
+import android.view.Menu
+import android.view.MenuItem
+import android.view.View
+import android.widget.FrameLayout
+import android.widget.TextView
+import android.widget.Toast
+import androidx.viewpager.widget.ViewPager.OnPageChangeListener
+import com.google.android.material.bottomnavigation.BottomNavigationItemView
+import com.google.android.material.bottomnavigation.BottomNavigationMenuView
+import com.google.android.material.bottomnavigation.BottomNavigationView
+import com.google.android.material.bottomnavigation.BottomNavigationView.OnNavigationItemReselectedListener
+import com.google.android.material.snackbar.Snackbar
+import com.huanchengfly.tieba.post.BaseApplication
+import com.huanchengfly.tieba.post.R
+import com.huanchengfly.tieba.post.adapters.MainSearchAdapter
+import com.huanchengfly.tieba.post.adapters.ViewPagerAdapter
+import com.huanchengfly.tieba.post.api.Error
+import com.huanchengfly.tieba.post.api.LiteApi.Companion.instance
+import com.huanchengfly.tieba.post.api.interfaces.CommonAPICallback
+import com.huanchengfly.tieba.post.api.interfaces.CommonCallback
+import com.huanchengfly.tieba.post.api.models.ChangelogBean
+import com.huanchengfly.tieba.post.api.models.NewUpdateBean
+import com.huanchengfly.tieba.post.fragments.ForumListFragment
+import com.huanchengfly.tieba.post.fragments.MessageFragment
+import com.huanchengfly.tieba.post.fragments.MyInfoFragment
+import com.huanchengfly.tieba.post.fragments.PersonalizedFeedFragment
+import com.huanchengfly.tieba.post.getColorCompat
+import com.huanchengfly.tieba.post.goToActivity
+import com.huanchengfly.tieba.post.interfaces.Refreshable
+import com.huanchengfly.tieba.post.models.MyInfoBean
+import com.huanchengfly.tieba.post.models.database.SearchHistory
+import com.huanchengfly.tieba.post.services.NotifyJobService
+import com.huanchengfly.tieba.post.utils.*
+import com.huanchengfly.tieba.post.widgets.MyViewPager
+import com.huanchengfly.tieba.post.widgets.theme.TintToolbar
+import com.lapism.searchview.Search
+import com.lapism.searchview.widget.SearchView
+
+open class MainActivity : BaseActivity(), BottomNavigationView.OnNavigationItemSelectedListener, MainSearchAdapter.OnSearchItemClickListener, OnNavigationItemReselectedListener {
+    var mAdapter: ViewPagerAdapter? = ViewPagerAdapter(supportFragmentManager)
+    private var mToolbar: TintToolbar? = null
+    private var mViewPager: MyViewPager? = null
+    private var mBottomNavigationView: BottomNavigationView? = null
+    private var menuView: BottomNavigationMenuView? = null
+    private var mSearchView: SearchView? = null
+    private var lastTime: Long = 0
+    private var navigationHelper: NavigationHelper? = null
+    private var hideExplore = false
+    private var badgeTextView: TextView? = null
+    private val newMessageReceiver: BroadcastReceiver = NewMessageReceiver()
+    private val accountSwitchReceiver: BroadcastReceiver = AccountSwitchReceiver()
+    private var appbar: FrameLayout? = null
+    private var mSearchAdapter: MainSearchAdapter? = null
+    public override fun onResume() {
+        val reason = ThemeUtil.getSharedPreferences(this).getString(ThemeUtil.SP_SWITCH_REASON, null)
+        val followSystemNight = appPreferences.followSystemNight
+        if (followSystemNight) {
+            if (BaseApplication.isSystemNight && !ThemeUtil.isNightMode(this)) {
+                SharedPreferencesUtil.put(ThemeUtil.getSharedPreferences(this), SP_SHOULD_SHOW_SNACKBAR, true)
+                ThemeUtil.switchToNightMode(this, ThemeUtil.REASON_FOLLOW_SYSTEM, false)
+            } else if (!BaseApplication.isSystemNight && ThemeUtil.isNightMode(this) && TextUtils.equals(reason, ThemeUtil.REASON_FOLLOW_SYSTEM)) {
+                SharedPreferencesUtil.put(ThemeUtil.getSharedPreferences(this), SP_SHOULD_SHOW_SNACKBAR, true)
+                ThemeUtil.switchFromNightMode(this, ThemeUtil.REASON_FOLLOW_SYSTEM, false)
+            }
+        }
+        super.onResume()
+        refreshSearchView()
+        ThemeUtil.setTranslucentThemeBackground(findViewById(R.id.background))
+        if (ThemeUtil.THEME_TRANSLUCENT == ThemeUtil.getTheme(this)) {
+            mBottomNavigationView!!.elevation = 0f
+        } else {
+            mBottomNavigationView!!.elevation = DisplayUtil.dp2px(this, 4f).toFloat()
+        }
+    }
+
+    override fun onNavigationItemReselected(item: MenuItem) {
+        val fragment = mAdapter!!.currentFragment
+        if (fragment is Refreshable) {
+            (fragment as Refreshable).onRefresh()
+        }
+    }
+
+    fun openSearch() {
+        mSearchView!!.open(null)
+    }
+
+    override fun onNavigationItemSelected(item: MenuItem): Boolean {
+        when (item.itemId) {
+            R.id.navbar_home -> {
+                mViewPager!!.setCurrentItem(0, false)
+                return true
+            }
+            R.id.navbar_explore -> {
+                if (!hideExplore) {
+                    mViewPager!!.setCurrentItem(1, false)
+                }
+                return true
+            }
+            R.id.navbar_msg -> {
+                mViewPager!!.setCurrentItem(if (hideExplore) 1 else 2, false)
+                return true
+            }
+            R.id.navbar_user -> {
+                mViewPager!!.setCurrentItem(if (hideExplore) 2 else 3, false)
+                return true
+            }
+        }
+        return false
+    }
+
+    private fun findView() {
+        appbar = findViewById(R.id.appbar) as FrameLayout
+        mToolbar = findViewById(R.id.toolbar) as TintToolbar
+        mSearchView = findViewById(R.id.toolbar_search_view) as SearchView
+        mBottomNavigationView = findViewById(R.id.navbar) as BottomNavigationView
+        menuView = mBottomNavigationView!!.getChildAt(0) as BottomNavigationMenuView
+        mViewPager = findViewById(R.id.mViewPager) as MyViewPager
+        /*
+        int[][] states = new int[2][];
+        states[0] = new int[] { android.R.attr.state_checked };
+        states[1] = new int[] {};
+        int color = Util.getColorByStyle(this, R.styleable.Theme_colorAccent, R.color.colorAccent);
+        mBottomNavigationView.setItemIconTintList(new ColorStateList(states, new int[]{color, getLighterColor(color, 0.2f)}));
+        mBottomNavigationView.setItemTextColor(new ColorStateList(states, new int[]{color, getLighterColor(color, 0.2f)}));
+        mBottomNavigationView.setLabelVisibilityMode(LabelVisibilityMode.LABEL_VISIBILITY_AUTO);
+        */
+    }
+
+    protected fun initView() {
+        mSearchAdapter = MainSearchAdapter(this)
+        mSearchAdapter!!.onSearchItemClickListener = this
+        mSearchView!!.adapter = mSearchAdapter
+        val itemView = menuView!!.getChildAt(if (hideExplore) 1 else 2) as BottomNavigationItemView
+        val badge = LayoutInflater.from(this@MainActivity).inflate(R.layout.layout_badge, menuView, false)
+        itemView.addView(badge)
+        badgeTextView = badge.findViewById(R.id.tv_msg_count)
+        navigationHelper = NavigationHelper.newInstance(this)
+        setSupportActionBar(mToolbar)
+        hideExplore = getSharedPreferences("settings", Context.MODE_PRIVATE).getBoolean("hideExplore", false)
+        if (hideExplore) {
+            mBottomNavigationView!!.menu.removeItem(R.id.navbar_explore)
+        }
+        val fragmentHome = ForumListFragment()
+        mAdapter!!.addFragment(fragmentHome)
+        if (!hideExplore) {
+            val personalizedFeedFragment = PersonalizedFeedFragment()
+            mAdapter!!.addFragment(personalizedFeedFragment)
+        }
+        val messageFragment = MessageFragment.newInstance(MessageFragment.TYPE_REPLY_ME)
+        mAdapter!!.addFragment(messageFragment)
+        val fragmentMine = MyInfoFragment()
+        mAdapter!!.addFragment(fragmentMine)
+        mViewPager!!.isCanScroll = false
+        mViewPager!!.adapter = mAdapter
+        mViewPager!!.offscreenPageLimit = mAdapter!!.count
+        refreshSearchView()
+    }
+
+    override fun refreshGlobal(activity: Activity) {
+        super.refreshGlobal(activity)
+        refreshSearchView()
+    }
+
+    private fun refreshSearchView() {
+        if (mSearchView == null) {
+            return
+        }
+        mSearchAdapter!!.refreshData()
+        mSearchView!!.theme = if (ThemeUtil.isNightMode(this) || ThemeUtil.THEME_TRANSLUCENT == ThemeUtil.getTheme(this)) Search.Theme.DARK else Search.Theme.LIGHT
+    }
+
+    protected fun initListener() {
+        mBottomNavigationView!!.setOnNavigationItemSelectedListener(this)
+        mBottomNavigationView!!.setOnNavigationItemReselectedListener(this)
+        mSearchView!!.setOnQueryTextListener(object : Search.OnQueryTextListener {
+            override fun onQueryTextChange(newText: CharSequence) {}
+            override fun onQueryTextSubmit(key: CharSequence): Boolean {
+                startActivity(Intent(this@MainActivity, SearchActivity::class.java)
+                        .putExtra(SearchActivity.EXTRA_KEYWORD, key.toString()))
+                SearchHistory(key.toString())
+                        .saveOrUpdate("content = ?", key.toString())
+                return true
+            }
+        })
+        mViewPager!!.addOnPageChangeListener(object : OnPageChangeListener {
+            override fun onPageScrolled(position: Int, positionOffset: Float, positionOffsetPixels: Int) {}
+
+            @SuppressLint("RestrictedApi")
+            override fun onPageSelected(position: Int) {
+                val baseFragment = mAdapter!!.getItem(position)
+                appbar!!.visibility = if (baseFragment.hasOwnAppbar()) View.GONE else View.VISIBLE
+                mBottomNavigationView!!.menu.getItem(position).isChecked = true
+                mToolbar!!.title = mBottomNavigationView!!.menu.getItem(position).title
+                if (position == (if (hideExplore) 1 else 2)) {
+                    badgeTextView!!.visibility = View.GONE
+                }
+            }
+
+            override fun onPageScrollStateChanged(state: Int) {}
+        })
+    }
+
+    @SuppressLint("ApplySharedPref")
+    protected fun clearSwitchReason() {
+        if (TextUtils.equals(ThemeUtil.getSharedPreferences(this).getString(ThemeUtil.SP_SWITCH_REASON, null), ThemeUtil.REASON_MANUALLY)) {
+            ThemeUtil.getSharedPreferences(this).edit().remove(ThemeUtil.SP_SWITCH_REASON).commit()
+        }
+    }
+
+    protected fun shouldShowSwitchSnackbar(): Boolean {
+        return ThemeUtil.getSharedPreferences(this).getBoolean(SP_SHOULD_SHOW_SNACKBAR, false)
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setSwipeBackEnable(false)
+        setContentView(R.layout.activity_main)
+        ThemeUtil.setTranslucentThemeBackground(findViewById(R.id.background))
+        findView()
+        initView()
+        initListener()
+        if (!SharedPreferencesUtil.get(SharedPreferencesUtil.SP_APP_DATA).getBoolean("notice_dialog", false)) {
+            showDialog(DialogUtil.build(this)
+                    .setTitle(R.string.title_dialog_notice)
+                    .setMessage(R.string.message_dialog_notice)
+                    .setPositiveButton(R.string.button_sure_default) { _: DialogInterface?,
+                                                                       _: Int ->
+                        SharedPreferencesUtil.put(this, SharedPreferencesUtil.SP_APP_DATA, "notice_dialog", true)
+                    }
+                    .setCancelable(false)
+                    .create())
+        }
+        if (savedInstanceState == null) {
+            clearSwitchReason()
+        }
+        if (shouldShowSwitchSnackbar()) {
+            Util.createSnackbar(mViewPager!!, if (ThemeUtil.isNightMode(this)) R.string.snackbar_auto_switch_to_night else R.string.snackbar_auto_switch_from_night, Snackbar.LENGTH_SHORT)
+                    .show()
+            SharedPreferencesUtil.put(ThemeUtil.getSharedPreferences(this), SP_SHOULD_SHOW_SNACKBAR, false)
+        }
+        handler.postDelayed({
+            checkUpdate()
+            try {
+                TiebaUtil.initAutoSign(this)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+            if (AccountUtil.isLoggedIn(this) && AccountUtil.getCookie(this) == null) {
+                showDialog(DialogUtil.build(this)
+                        .setTitle(R.string.title_dialog_update_stoken)
+                        .setMessage(R.string.message_dialog_update_stoken)
+                        .setPositiveButton(R.string.button_sure_default) { _: DialogInterface?, _: Int -> startActivity(UpdateInfoActivity.newIntent(this, UpdateInfoActivity.ACTION_UPDATE_LOGIN_INFO)) }
+                        .setCancelable(false)
+                        .create())
+            }
+            AccountUtil.updateUserInfo(this, object : CommonCallback<MyInfoBean?> {
+                override fun onSuccess(data: MyInfoBean?) {}
+                override fun onFailure(code: Int, error: String) {
+                    if (code == Error.ERROR_LOGGED_IN_EXPIRED) {
+                        showDialog(DialogUtil.build(this@MainActivity)
+                                .setTitle(R.string.title_dialog_logged_in_expired)
+                                .setMessage(R.string.message_dialog_logged_in_expired)
+                                .setPositiveButton(R.string.button_ok) { _: DialogInterface?, _: Int -> navigationHelper!!.navigationByData(NavigationHelper.ACTION_LOGIN) }
+                                .setCancelable(false)
+                                .create())
+                    }
+                }
+            })
+        }, 1000)
+        if (BaseApplication.isFirstRun) {
+            goToActivity<NewIntroActivity>()
+        } else if (!AccountUtil.isLoggedIn(this)) {
+            navigationHelper!!.navigationByData(NavigationHelper.ACTION_LOGIN)
+        }
+        /*
+        handler.postDelayed(() -> {
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    String relativePath = Environment.DIRECTORY_PICTURES + File.separator + "Tieba Lite" + File.separator + "shareTemp";
+                    String where = MediaStore.Images.Media.RELATIVE_PATH + " like \"" + relativePath + "%" + "\"";
+                    int i = getContentResolver().delete(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, where, null);
+                } else {
+                    if (AndPermission.hasPermissions(this, Permission.Group.STORAGE)) {
+                        File shareTemp = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES).getAbsoluteFile(), "Tieba Lite" + File.separator + "shareTemp");
+                        if (shareTemp.exists() && shareTemp.delete()) {
+                            FileUtil.deleteAllFiles(shareTemp);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }, 100);
+        */
+    }
+
+    override fun recreate() {
+        super.recreate()
+        Log.i(TAG, "recreate: ")
+    }
+
+    override fun onStart() {
+        super.onStart()
+        registerReceiver(newMessageReceiver, ReceiverUtil.createIntentFilter(NotifyJobService.ACTION_NEW_MESSAGE))
+        registerReceiver(accountSwitchReceiver, ReceiverUtil.createIntentFilter(AccountUtil.ACTION_SWITCH_ACCOUNT))
+        try {
+            startService(Intent(this, NotifyJobService::class.java))
+            val builder = JobInfo.Builder(JobServiceUtil.getJobId(this), ComponentName(this, NotifyJobService::class.java))
+                    .setPersisted(true)
+                    .setPeriodic(30 * 60 * 1000L)
+                    .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
+            val jobScheduler = getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
+            jobScheduler.schedule(builder.build())
+        } catch (ignored: Exception) {
+        }
+    }
+
+    override fun onStop() {
+        try {
+            stopService(Intent(this, NotifyJobService::class.java))
+        } catch (ignored: Exception) {
+        }
+        unregisterReceiver(newMessageReceiver)
+        unregisterReceiver(accountSwitchReceiver)
+        super.onStop()
+    }
+
+    private fun checkUpdate() {
+        val oldVersion = SharedPreferencesUtil.get(this, SharedPreferencesUtil.SP_APP_DATA).getInt("version", -1)
+        if (oldVersion < VersionUtil.getVersionCode(this)) {
+            instance!!.changelog(object : CommonAPICallback<ChangelogBean?> {
+                override fun onSuccess(data: ChangelogBean?) {
+                    SharedPreferencesUtil.get(this@MainActivity, SharedPreferencesUtil.SP_APP_DATA)
+                            .edit()
+                            .putInt("version", VersionUtil.getVersionCode(this@MainActivity))
+                            .apply()
+                    if (data != null) {
+                        if (!TextUtils.isEmpty(data.result)) {
+                            showDialog(DialogUtil.build(this@MainActivity)
+                                    .setTitle(R.string.title_dialog_changelog)
+                                    .setMessage(data.result)
+                                    .setPositiveButton(R.string.button_ok, null)
+                                    .create())
+                        }
+                    }
+                }
+
+                override fun onFailure(code: Int, error: String?) {}
+            })
+        }
+        instance!!.newCheckUpdate(object : CommonAPICallback<NewUpdateBean?> {
+            override fun onSuccess(data: NewUpdateBean?) {
+                if (data != null) {
+                    if (data.isHasUpdate) {
+                        val cancelable = data.result?.isCancelable
+                        val ignored = SharedPreferencesUtil.get(this@MainActivity, SharedPreferencesUtil.SP_IGNORE_VERSIONS)
+                                .getBoolean(data.result?.versionName + "_" + (data.result?.versionCode), false)
+                        if (ignored && cancelable!!) {
+                            return
+                        }
+                        val builder = SpannableStringBuilder()
+                        if (data.result?.versionType == 1) {
+                            val betaTip = getString(R.string.tip_beta_version)
+                            builder.append(betaTip, ForegroundColorSpan(getColorCompat(R.color.red)), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                            builder.setSpan(StyleSpan(Typeface.BOLD), 0, betaTip.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                        }
+                        for (content in data.result?.updateContent!!) {
+                            builder.append(content)
+                            builder.append("\n")
+                        }
+                        val dialogBuilder = DialogUtil.build(this@MainActivity)
+                                .setTitle(getString(R.string.title_dialog_update, data.result.versionName))
+                                .setMessage(builder)
+                                .setPositiveButton(R.string.button_go_to_download) { _: DialogInterface?, _: Int -> VersionUtil.showDownloadDialog(this@MainActivity, data.result) }
+                                .setCancelable(cancelable!!)
+                        if (cancelable) {
+                            dialogBuilder.setNegativeButton(R.string.button_next_time, null)
+                            dialogBuilder.setNeutralButton(R.string.button_ignore_this_version) { _: DialogInterface?, _: Int ->
+                                SharedPreferencesUtil.get(this@MainActivity, SharedPreferencesUtil.SP_IGNORE_VERSIONS)
+                                        .edit()
+                                        .putBoolean(data.result.versionName + "_" + data.result.versionCode, true)
+                                        .apply()
+                            }
+                        }
+                        showDialog(dialogBuilder.create())
+                    }
+                }
+            }
+
+            override fun onFailure(code: Int, error: String?) {}
+        })
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.toolbar_menu, menu)
+        return super.onCreateOptionsMenu(menu)
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        when (item.itemId) {
+            R.id.menu_sign -> {
+                TiebaUtil.startSign(this@MainActivity)
+                return true
+            }
+            R.id.action_search -> {
+                mSearchView!!.open(item)
+                return true
+            }
+        }
+        return super.onOptionsItemSelected(item)
+    }
+
+    override fun onBackPressed() {
+        if (mSearchView!!.isOpen) {
+            mSearchView!!.close()
+        } else {
+            if (!HandleBackUtil.handleBackPress(this)) {
+                exit()
+            }
+        }
+    }
+
+    @JvmOverloads
+    fun exit(isDouble: Boolean = true) {
+        if (!isDouble || System.currentTimeMillis() - lastTime < 2000) {
+            exitApplication()
+        } else {
+            lastTime = System.currentTimeMillis()
+            Toast.makeText(this, R.string.toast_double_key_exit, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    override fun setTitle(newTitle: String) {
+        mToolbar!!.title = newTitle
+    }
+
+    override fun onSearchItemClick(position: Int, content: CharSequence) {
+        startActivity(Intent(this@MainActivity, SearchActivity::class.java)
+                .putExtra(SearchActivity.EXTRA_KEYWORD, content.toString()))
+        SearchHistory(content.toString())
+                .saveOrUpdate("content = ?", content.toString())
+        refreshSearchView()
+    }
+
+    private inner class NewMessageReceiver : BroadcastReceiver() {
+        @SuppressLint("RestrictedApi")
+        override fun onReceive(context: Context, intent: Intent) {
+            try {
+                val action = intent.action
+                if (action != null && action == NotifyJobService.ACTION_NEW_MESSAGE) {
+                    val channel = intent.getStringExtra("channel")
+                    val count = intent.getIntExtra("count", 0)
+                    if (channel != null && channel == NotifyJobService.CHANNEL_TOTAL && badgeTextView != null) {
+                        badgeTextView!!.text = count.toString()
+                        if (count > 0) {
+                            badgeTextView!!.visibility = View.VISIBLE
+                        }
+                    }
+                }
+            } catch (ignored: Exception) {
+            }
+        }
+    }
+
+    private inner class AccountSwitchReceiver : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            val action = intent.action
+            if (action != null && action == AccountUtil.ACTION_SWITCH_ACCOUNT) {
+                if (mAdapter == null) {
+                    return
+                }
+                val fragments = mAdapter!!.fragments
+                for (fragment in fragments) {
+                    if (fragment != null) {
+                        try {
+                            fragment.onAccountSwitch()
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    companion object {
+        const val TAG = "MainActivity"
+        const val SP_SHOULD_SHOW_SNACKBAR = "should_show_snackbar"
+        private val handler = Handler()
+    }
+}package com.huanchengfly.tieba.post.activities
+
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.content.Context
+import android.content.Intent
+import android.graphics.Color
+import android.net.Uri
+import android.os.Build
+import android.os.Bundle
+import android.os.Handler
+import android.view.MenuItem
+import android.view.View
+import android.widget.TextView
+import android.widget.Toast
+import androidx.appcompat.widget.Toolbar
+import androidx.viewpager2.widget.ViewPager2
+import androidx.viewpager2.widget.ViewPager2.OnPageChangeCallback
+import butterknife.BindView
+import com.google.android.material.bottomappbar.BottomAppBar
+import com.huanchengfly.tieba.post.ui.theme.utils.ThemeUtils
+import com.huanchengfly.tieba.post.api.TiebaApi.getInstance
+import com.huanchengfly.tieba.post.api.models.PicPageBean
+import com.huanchengfly.tieba.post.api.models.PicPageBean.ImgInfoBean
+import com.huanchengfly.tieba.post.R
+import com.huanchengfly.tieba.post.adapters.PhotoViewAdapter
+import com.huanchengfly.tieba.post.BaseApplication.ScreenInfo
+import com.huanchengfly.tieba.post.fragments.PhotoViewFragment.OnChangeBottomBarVisibilityListener
+import com.huanchengfly.tieba.post.models.PhotoViewBean
+import com.huanchengfly.tieba.post.utils.AnimUtil
+import com.huanchengfly.tieba.post.utils.ImageUtil
+import retrofit2.Call
+import retrofit2.Callback
+import retrofit2.Response
+import java.util.*
+
+class PhotoViewActivity : BaseActivity(), OnChangeBottomBarVisibilityListener, Toolbar.OnMenuItemClickListener {
+    @BindView(R.id.counter)
+    lateinit var mCounter: TextView
+    @BindView(R.id.bottom_app_bar)
+    lateinit var mAppBar: BottomAppBar
+    @BindView(R.id.view_pager)
+    lateinit var mViewPager: ViewPager2
+
+    private lateinit var photoViewBeans: MutableList<PhotoViewBean>
+    private lateinit var mAdapter: PhotoViewAdapter
+    private var startPosition = 0
+    private var lastIndex = 0
+    private var seeLz = false
+    private var isFrs = false
+    private var mLoading = false
+    private var loadFinished = false
+    private val autoHideRunnable = Runnable { onHide() }
+    private var amount: String? = null
+    private var forumName: String? = null
+    private var forumId: String? = null
+    private var threadId: String? = null
+    private var objType: String? = null
+
+    private fun loadMore() {
+        if (loadFinished) {
+            return
+        }
+        if (mLoading) {
+            return
+        }
+        mLoading = true
+        val lastBean = photoViewBeans[photoViewBeans.size - 1]
+        getInstance().picPage(
+                forumId!!,
+                forumName!!,
+                threadId!!,
+                seeLz,
+                ImageUtil.getPicId(lastBean.originUrl), photoViewBeans.size.toString(),
+                objType!!,
+                false
+        ).enqueue(object : Callback<PicPageBean?> {
+            override fun onResponse(call: Call<PicPageBean?>, response: Response<PicPageBean?>) {
+                val data = response.body()!!
+                mLoading = false
+                amount = data.picAmount ?: "${photoViewBeans.size}"
+                updateCounter(mViewPager.currentItem)
+                val picBeans: MutableList<PicPageBean.PicBean> = ArrayList()
+                val imgInfoBeans: MutableList<ImgInfoBean> = ArrayList()
+                if (data.picList?.isNotEmpty()!!) {
+                    val index = data.picList.last().overAllIndex?.toInt()
+                    if (index != null) {
+                        loadFinished = index >= amount!!.toInt()
+                    }
+                    picBeans.addAll(data.picList)
+                    picBeans.forEach {
+                        it.img?.original?.let { it1 -> imgInfoBeans.add(it1) }
+                    }
+                    lastIndex = picBeans.first().overAllIndex?.toInt()!!
+                    for (photoViewBean in photoViewBeans) {
+                        val ind = lastIndex - (photoViewBeans.size - 1 - photoViewBeans.indexOf(photoViewBean))
+                        photoViewBean.index = ind.toString()
+                    }
+                    picBeans.removeAt(0)
+                    imgInfoBeans.removeAt(0)
+                    val beans = imgInfoBeans.mapIndexed { i, it ->
+                        PhotoViewBean(it.bigCdnSrc,
+                                it.originalSrc,
+                                (it.height ?: "0").toInt() > ScreenInfo.EXACT_SCREEN_HEIGHT,
+                                picBeans[i].overAllIndex,
+                                "2" == it.format)
+                    }.toMutableList()
+                    mAdapter.insert(beans)
+                    photoViewBeans = mAdapter.data
+                    mAdapter.notifyDataSetChanged()
+                    updateCounter(mViewPager.currentItem)
+                } else {
+                    loadFinished = true
+                }
+            }
+
+            override fun onFailure(call: Call<PicPageBean?>, t: Throwable) {
+                mLoading = false
+            }
+        })
+    }
+
+    private fun loadFrs() {
+        forumName = intent.getStringExtra(EXTRA_FORUM_NAME)
+        forumId = intent.getStringExtra(EXTRA_FORUM_ID)
+        threadId = intent.getStringExtra(EXTRA_THREAD_ID)
+        seeLz = intent.getBooleanExtra(EXTRA_SEE_LZ, false)
+        objType = intent.getStringExtra(EXTRA_OBJ_TYPE)
+        loadMore()
+    }
+
+    override fun getLayoutId(): Int {
+        return R.layout.activity_photo_view
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        window.decorView.systemUiVisibility = (View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY)
+        mAppBar.setOnMenuItemClickListener(this)
+        val overflowIcon = mAppBar.overflowIcon
+        if (overflowIcon != null) {
+            mAppBar.overflowIcon = ThemeUtils.tintDrawable(overflowIcon, Color.WHITE)
+        }
+        isFrs = intent.getBooleanExtra(EXTRA_IS_FRS, false)
+        photoViewBeans = mutableListOf()
+        startPosition = intent.getIntExtra(EXTRA_POSITION, 0)
+        val parcelables = intent.getParcelableArrayExtra(EXTRA_BEANS)!!
+        photoViewBeans.addAll(parcelables.map { it as PhotoViewBean })
+        amount = photoViewBeans.size.toString()
+        mAdapter = PhotoViewAdapter(this, photoViewBeans)
+        mViewPager.adapter = mAdapter
+        mViewPager.setCurrentItem(startPosition, false)
+        updateCounter()
+        mViewPager.registerOnPageChangeCallback(object : OnPageChangeCallback() {
+            override fun onPageScrolled(position: Int, positionOffset: Float, positionOffsetPixels: Int) {
+                onShow(true)
+            }
+
+            override fun onPageSelected(position: Int) {
+                updateCounter(position)
+                onShow(true)
+                if (!mLoading && isFrs && position >= photoViewBeans.size - 1) {
+                    loadMore()
+                }
+            }
+        })
+        if (isFrs) {
+            loadFrs()
+        }
+    }
+
+    override fun isNeedImmersionBar(): Boolean {
+        return false
+    }
+
+    override fun finish() {
+        super.finish()
+        overridePendingTransition(R.anim.anim_fade_in, R.anim.anim_fade_out)
+    }
+
+    override fun onBackPressed() {
+        finish()
+    }
+
+    private fun updateCounter(position: Int = startPosition) {
+        onShow(true)
+        if (photoViewBeans.size <= 1) {
+            mCounter.text = null
+        } else if (isFrs && lastIndex > 0) {
+            val index = photoViewBeans[position].index
+            mCounter.text = getString(R.string.tip_position, (index ?: position
+            + 1).toString(), amount)
+        } else {
+            mCounter.text = getString(R.string.tip_position, (position + 1).toString(), amount)
+        }
+    }
+
+    override fun onShow(autoHide: Boolean) {
+        handler.removeCallbacks(autoHideRunnable)
+        if (mAppBar.visibility == View.VISIBLE) {
+            if (autoHide) {
+                handler.postDelayed(autoHideRunnable, DEFAULT_HIDE_DELAY.toLong())
+            }
+            return
+        }
+        AnimUtil.alphaIn(mAppBar)
+                .setListener(object : AnimatorListenerAdapter() {
+                    override fun onAnimationEnd(animation: Animator) {
+                        mAppBar.visibility = View.VISIBLE
+                    }
+
+                    override fun onAnimationEnd(animation: Animator, isReverse: Boolean) {
+                        if (autoHide) {
+                            handler.postDelayed(autoHideRunnable, DEFAULT_HIDE_DELAY.toLong())
+                        }
+                    }
+                })
+                .start()
+    }
+
+    override fun onHide() {
+        if (mAppBar.visibility == View.GONE || mViewPager.orientation != ViewPager2.ORIENTATION_HORIZONTAL) {
+            return
+        }
+        AnimUtil.alphaOut(mAppBar)
+                .setListener(object : AnimatorListenerAdapter() {
+                    override fun onAnimationEnd(animation: Animator) {
+                        mAppBar.visibility = View.GONE
+                    }
+                })
+                .start()
+    }
+
+    override fun onMenuItemClick(item: MenuItem): Boolean {
+        when (item.itemId) {
+            R.id.menu_toggle_orientation -> {
+                item.setIcon(if (mViewPager.orientation == ViewPager2.ORIENTATION_HORIZONTAL) R.drawable.ic_round_view_day_white else R.drawable.ic_round_view_carousel_white)
+                item.setTitle(if (mViewPager.orientation == ViewPager2.ORIENTATION_HORIZONTAL) R.string.title_comic_mode_on else R.string.title_comic_mode)
+                Toast.makeText(this, if (mViewPager.orientation == ViewPager2.ORIENTATION_HORIZONTAL) R.string.toast_comic_mode_on else R.string.toast_comic_mode_off, Toast.LENGTH_SHORT).show()
+                mViewPager.orientation = if (mViewPager.orientation == ViewPager2.ORIENTATION_HORIZONTAL) ViewPager2.ORIENTATION_VERTICAL else ViewPager2.ORIENTATION_HORIZONTAL
+                return true
+            }
+            R.id.menu_save_image -> {
+                ImageUtil.download(this, mAdapter.getBean(mViewPager.currentItem).originUrl, mAdapter.getBean(mViewPager.currentItem).isGif)
+                return true
+            }
+            R.id.menu_share -> {
+                Toast.makeText(this, R.string.toast_preparing_share_pic, Toast.LENGTH_SHORT).show()
+                ImageUtil.download(this, mAdapter.getBean(mViewPager.currentItem).originUrl, mAdapter.getBean(mViewPager.currentItem).isGif, true) { uri: Uri? ->
+                    val intent = Intent(Intent.ACTION_SEND)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                        intent.putExtra(Intent.EXTRA_STREAM, uri)
+                        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    } else {
+                        intent.putExtra(Intent.EXTRA_STREAM, uri)
+                    }
+                    intent.type = Intent.normalizeMimeType("image/jpeg")
+                    val chooser = Intent.createChooser(intent, getString(R.string.title_share_pic))
+                    if (intent.resolveActivity(packageManager) != null) {
+                        startActivity(chooser)
+                    }
+                }
+                return true
+            }
+        }
+        return false
+    }
+
+    companion object {
+        val TAG = PhotoViewActivity::class.java.simpleName
+        const val EXTRA_BEANS = "beans"
+        const val EXTRA_POSITION = "position"
+        const val EXTRA_FORUM_ID = "forum_id"
+        const val EXTRA_FORUM_NAME = "forum_name"
+        const val EXTRA_THREAD_ID = "thread_id"
+        const val EXTRA_SEE_LZ = "see_lz"
+        const val EXTRA_IS_FRS = "is_frs"
+        const val EXTRA_OBJ_TYPE = "obj_type"
+        const val DEFAULT_HIDE_DELAY = 3000
+        const val OBJ_TYPE_THREAD_PAGE = "pb"
+        const val OBJ_TYPE_FORUM_PAGE = "frs"
+        private val handler = Handler()
+
+        @JvmStatic
+        fun launch(context: Context, photoViewBean: PhotoViewBean) {
+            launch(context, arrayOf(photoViewBean))
+        }
+
+        @JvmStatic
+        fun launch(context: Context, photoViewBeanList: List<PhotoViewBean>) {
+            launch(context, photoViewBeanList.toTypedArray(), 0)
+        }
+
+        @JvmStatic
+        fun launch(context: Context, photoViewBeanList: List<PhotoViewBean>, position: Int) {
+            launch(context, photoViewBeanList.toTypedArray(), position)
+        }
+
+        @JvmStatic
+        @JvmOverloads
+        fun launch(context: Context, photoViewBeans: Array<PhotoViewBean>, position: Int = 0) {
+            context.startActivity(Intent(context, PhotoViewActivity::class.java)
+                    .putExtra(EXTRA_BEANS, photoViewBeans)
+                    .putExtra(EXTRA_POSITION, position)
+                    .putExtra(EXTRA_IS_FRS, false))
+        }
+
+        @JvmStatic
+        fun launch(context: Context,
+                   photoViewBeans: Array<PhotoViewBean?>?,
+                   position: Int,
+                   forumName: String?,
+                   forumId: String?,
+                   threadId: String?,
+                   seeLz: Boolean,
+                   objType: String?) {
+            context.startActivity(Intent(context, PhotoViewActivity::class.java)
+                    .putExtra(EXTRA_BEANS, photoViewBeans)
+                    .putExtra(EXTRA_POSITION, position)
+                    .putExtra(EXTRA_IS_FRS, true)
+                    .putExtra(EXTRA_FORUM_NAME, forumName)
+                    .putExtra(EXTRA_FORUM_ID, forumId)
+                    .putExtra(EXTRA_THREAD_ID, threadId)
+                    .putExtra(EXTRA_SEE_LZ, seeLz)
+                    .putExtra(EXTRA_OBJ_TYPE, objType))
+        }
+    }
+}package com.huanchengfly.tieba.post.activities
+
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.ValueAnimator
+import android.annotation.SuppressLint
+import android.content.*
+import android.content.res.ColorStateList
+import android.graphics.Rect
+import android.net.Uri
+import android.os.Bundle
+import android.text.InputType
+import android.text.TextUtils
+import android.view.Menu
+import android.view.MenuItem
+import android.view.View
+import android.widget.ImageView
+import android.widget.RelativeLayout
+import android.widget.TextView
+import android.widget.Toast
+import androidx.appcompat.widget.Toolbar
+import androidx.recyclerview.widget.RecyclerView
+import androidx.recyclerview.widget.RecyclerView.OnChildAttachStateChangeListener
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+import butterknife.BindView
+import cn.jzvd.Jzvd
+import com.billy.android.preloader.PreLoader
+import com.bumptech.glide.Glide
+import com.google.android.material.snackbar.Snackbar
+import com.huanchengfly.tieba.post.R
+import com.huanchengfly.tieba.post.adapters.RecyclerThreadAdapter
+import com.huanchengfly.tieba.post.api.TiebaApi
+import com.huanchengfly.tieba.post.api.interfaces.CommonAPICallback
+import com.huanchengfly.tieba.post.api.models.AgreeBean
+import com.huanchengfly.tieba.post.api.models.CommonResponse
+import com.huanchengfly.tieba.post.api.models.ThreadContentBean
+import com.huanchengfly.tieba.post.api.models.ThreadContentBean.PostListItemBean
+import com.huanchengfly.tieba.post.api.retrofit.exception.TiebaException
+import com.huanchengfly.tieba.post.components.MyLinearLayoutManager
+import com.huanchengfly.tieba.post.components.dialogs.EditTextDialog
+import com.huanchengfly.tieba.post.components.dividers.ThreadDivider
+import com.huanchengfly.tieba.post.models.ReplyInfoBean
+import com.huanchengfly.tieba.post.models.ThreadHistoryInfoBean
+import com.huanchengfly.tieba.post.models.database.History
+import com.huanchengfly.tieba.post.ui.theme.utils.ThemeUtils
+import com.huanchengfly.tieba.post.utils.*
+import com.huanchengfly.tieba.post.utils.preload.PreloadUtil
+import com.huanchengfly.tieba.post.utils.preload.loaders.ThreadContentLoader
+import com.huanchengfly.tieba.post.widgets.VideoPlayerStandard
+import me.imid.swipebacklayout.lib.SwipeBackLayout.SwipeListener
+import retrofit2.Call
+import retrofit2.Callback
+import retrofit2.Response
+
+class ThreadActivity : BaseActivity(), View.OnClickListener {
+    @BindView(R.id.toolbar)
+    lateinit var toolbar: Toolbar
+    private var dataBean: ThreadContentBean? = null
+    @BindView(R.id.thread_refresh_view)
+    lateinit var refreshLayout: SwipeRefreshLayout
+    private var historyHelper: HistoryHelper? = null
+    @BindView(R.id.thread_bottom_bar_agree_btn)
+    lateinit var agreeBtn: ImageView
+    @BindView(R.id.thread_bottom_bar_agree_num)
+    lateinit var agreeNumTextView: TextView
+    private var agreeNum = 0
+    @BindView(R.id.thread_recycler_view)
+    lateinit var recyclerView: RecyclerView
+    lateinit var mAdapter: RecyclerThreadAdapter
+    lateinit var mLayoutManager: MyLinearLayoutManager
+    private var tid: String? = ""
+    private var pid = ""
+    private var from = ""
+    private var maxPid: String? = ""
+    private var tip = false
+    private var seeLz = false
+    private var sort = false
+    private var collect = false
+    private var agree = false
+    private var page = 0
+    private var totalPage = 0
+    private val replyReceiver: BroadcastReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            val action = intent.action
+            if (action != null && action == ACTION_REPLY_SUCCESS) {
+                val pid = intent.getStringExtra("pid")
+                if (pid != null) refreshByPid(pid) else refresh(false)
+            }
+        }
+    }
+    private var navigationHelper: NavigationHelper? = null
+    public override fun onSaveInstanceState(outState: Bundle) {
+        outState.putString("tid", tid)
+        outState.putString("pid", pid)
+        outState.putString("from", from)
+        outState.putBoolean("seeLz", seeLz)
+        outState.putBoolean("tip", tip)
+        outState.putBoolean("sort", sort)
+        outState.putBoolean("collect", collect)
+        super.onSaveInstanceState(outState)
+    }
+
+    public override fun onRestoreInstanceState(outState: Bundle) {
+        super.onRestoreInstanceState(outState)
+        tid = outState.getString("tid", tid)
+        pid = outState.getString("pid", pid)
+        from = outState.getString("from", from)
+        seeLz = outState.getBoolean("seeLz", seeLz)
+        tip = outState.getBoolean("tip", tip)
+        sort = outState.getBoolean("sort", sort)
+        collect = outState.getBoolean("collect", collect)
+    }
+
+    private val isTitleVisible: Boolean
+        get() {
+            if (recyclerView.childCount <= 0) {
+                return false
+            }
+            if (firstVisibleItemPosition > 0) {
+                return true
+            }
+            val child = recyclerView.getChildAt(0)
+            if (recyclerView.getChildViewHolder(child).itemViewType == RecyclerThreadAdapter.TYPE_REPLY) {
+                return true
+            }
+            val title = child.findViewById<View>(R.id.thread_list_item_content_title)
+            return title != null && !title.getGlobalVisibleRect(Rect())
+        }
+
+    private fun refreshTitle() {
+        if (dataBean != null && dataBean!!.thread != null && isTitleVisible) {
+            toolbar.title = dataBean!!.thread?.title
+            //toolbar.setSubtitle(getString(R.string.title_forum, dataBean.getForum().getName()));
+        } else {
+            toolbar.title = null
+            //toolbar.setSubtitle(null);
+        }
+    }
+
+    override fun getLayoutId(): Int {
+        return R.layout.activity_thread
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        navigationHelper = NavigationHelper.newInstance(this)
+        swipeBackLayout.addSwipeListener(object : SwipeListener {
+            override fun onScrollStateChange(state: Int, scrollPercent: Float) {}
+            override fun onEdgeTouch(edgeFlag: Int) {
+                exit()
+            }
+
+            override fun onScrollOverThreshold() {}
+        })
+        ThemeUtil.setTranslucentThemeBackground(findViewById(R.id.background))
+        refreshLayout.apply {
+            isNestedScrollingEnabled = true
+            setOnRefreshListener { refresh() }
+            ThemeUtil.setThemeForSwipeRefreshLayout(this)
+        }
+        val replyBar = findViewById(R.id.thread_reply_bar) as RelativeLayout
+        val agreeBtnHolder = findViewById(R.id.thread_bottom_bar_agree) as RelativeLayout
+        agreeBtnHolder.setOnClickListener(this)
+        toolbar.setOnClickListener(this)
+        historyHelper = HistoryHelper(this)
+        mLayoutManager = MyLinearLayoutManager(this)
+        mAdapter = RecyclerThreadAdapter(this).apply {
+            setOnLoadMoreListener { isReload: Boolean ->
+                if (isReload) {
+                    refresh(false)
+                } else {
+                    loadMore()
+                }
+            }
+        }
+        recyclerView.apply {
+            setOnTouchListener { _, _ -> refreshLayout.isRefreshing }
+            addItemDecoration(ThreadDivider(this@ThreadActivity))
+            layoutManager = mLayoutManager
+            adapter = mAdapter
+            if (!appPreferences.loadPictureWhenScroll) {
+                addOnScrollListener(object : RecyclerView.OnScrollListener() {
+                    override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+                        super.onScrollStateChanged(recyclerView, newState)
+                        if (!Util.canLoadGlide(this@ThreadActivity)) {
+                            return
+                        }
+                        if (newState == RecyclerView.SCROLL_STATE_IDLE) {
+                            Glide.with(this@ThreadActivity)
+                                    .resumeRequests()
+                        } else {
+                            Glide.with(this@ThreadActivity)
+                                    .pauseRequests()
+                        }
+                    }
+                })
+            }
+            addOnScrollListener(object : RecyclerView.OnScrollListener() {
+                override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+                    refreshTitle()
+                }
+
+                override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                    refreshTitle()
+                }
+            })
+            addOnChildAttachStateChangeListener(object : OnChildAttachStateChangeListener {
+                override fun onChildViewAttachedToWindow(view: View) {}
+                override fun onChildViewDetachedFromWindow(view: View) {
+                    if (refreshLayout.isRefreshing) {
+                        return
+                    }
+                    val videoPlayerStandard: VideoPlayerStandard? = view.findViewById(R.id.video_player)
+                    if (videoPlayerStandard != null && Jzvd.CURRENT_JZVD != null &&
+                            videoPlayerStandard.jzDataSource.containsTheUrl(Jzvd.CURRENT_JZVD.jzDataSource.currentUrl)) {
+                        if (Jzvd.CURRENT_JZVD != null && Jzvd.CURRENT_JZVD.screen != Jzvd.SCREEN_FULLSCREEN) {
+                            Jzvd.releaseAllVideos()
+                        }
+                    }
+                }
+            })
+        }
+        replyBar.setOnClickListener(this)
+        setSupportActionBar(toolbar)
+        val actionBar = supportActionBar
+        if (actionBar != null) {
+            actionBar.title = null
+            actionBar.setDisplayHomeAsUpEnabled(true)
+        }
+        val intent = intent
+        var tid: String? = ""
+        val seeLz: String
+        val pid: String?
+        val from: String?
+        var maxPid: String? = ""
+        if (intent.getStringExtra("url") == null) {
+            tid = intent.getStringExtra("tid")
+            pid = intent.getStringExtra("pid")
+            seeLz = if (intent.getBooleanExtra("seeLz", false)) "1" else "0"
+            from = intent.getStringExtra("from")
+            if ("collect" == from) {
+                maxPid = intent.getStringExtra("max_pid")
+            }
+        } else {
+            val uri = Uri.parse(intent.getStringExtra("url"))
+            if (uri.path!!.startsWith("/p/")) tid = uri.path!!.split("/p/").toTypedArray()[1] else if ((uri.path == "/mo/q/m") or (uri.path == "/f")) tid = uri.getQueryParameter("kz")
+            seeLz = uri.getQueryParameter("see_lz") ?: "0"
+            pid = uri.getQueryParameter("sc")
+            from = ""
+        }
+        this.tid = tid
+        this.seeLz = seeLz == "1"
+        this.pid = pid ?: ""
+        this.from = from ?: ""
+        this.maxPid = maxPid ?: ""
+        if (!TextUtils.isEmpty(this.tid)) {
+            mAdapter.isShowForum = FROM_FORUM != from
+            loadFirstData()
+        } else {
+            Toast.makeText(this, R.string.toast_param_error, Toast.LENGTH_SHORT).show()
+            finish()
+        }
+        refreshTitle()
+    }
+
+    fun hasMore(): Boolean {
+        if (dataBean!!.page?.hasMore != "1") {
+            mAdapter.loadEnd()
+            return false
+        }
+        return true
+    }
+
+    private fun loadMoreSuccess(threadContentBean: ThreadContentBean) {
+        dataBean = threadContentBean
+        page = Integer.valueOf(threadContentBean.page?.currentPage!!)
+        totalPage = Integer.valueOf(threadContentBean.page.totalPage!!)
+        mAdapter.addData(dataBean!!)
+        hasMore()
+        invalidateOptionsMenu()
+        preload()
+    }
+
+    fun loadMore() {
+        mAdapter.isSeeLz = seeLz
+        if (hasMore()) {
+            var page = page
+            if (sort) {
+                page -= 1
+            } else {
+                page += 1
+            }
+            if (PreLoader.exists(preloadId)) {
+                PreLoader.listenData(preloadId) { threadContentBean: ThreadContentBean? ->
+                    if (threadContentBean == null) {
+                        PreLoader.destroy(preloadId)
+                        loadMore()
+                    } else loadMoreSuccess(threadContentBean)
+                }
+                return
+            }
+            TiebaApi.getInstance().threadContent(tid!!, page, seeLz, sort).enqueue(object : Callback<ThreadContentBean> {
+                override fun onFailure(call: Call<ThreadContentBean>, t: Throwable) {
+                    mAdapter.loadFailed()
+                }
+
+                override fun onResponse(call: Call<ThreadContentBean>, response: Response<ThreadContentBean>) {
+                    loadMoreSuccess(response.body()!!)
+                }
+
+            })
+        }
+    }
+
+    private var preloadId = -1
+    private fun preload() {
+        PreLoader.destroy(preloadId)
+        if (hasMore() && !sort) {
+            preloadId = PreLoader.preLoad(ThreadContentLoader(tid!!, page + 1, seeLz))
+        }
+    }
+
+    private fun refreshSuccess(threadContentBean: ThreadContentBean) {
+        dataBean = threadContentBean
+        page = Integer.valueOf(threadContentBean.page?.currentPage!!)
+        totalPage = Integer.valueOf(threadContentBean.page.totalPage!!)
+        mAdapter.reset()
+        mAdapter.setData(threadContentBean)
+        title = threadContentBean.thread?.title
+        collect = threadContentBean.thread != null && "0" != threadContentBean.thread.collectStatus
+        agree = threadContentBean.thread?.agree != null && "0" != threadContentBean.thread.agree.hasAgree
+        agreeNumTextView.text = threadContentBean.thread?.agreeNum
+        agreeNum = Integer.valueOf(if (TextUtils.isEmpty(threadContentBean.thread?.agreeNum)) "0" else threadContentBean.thread?.agreeNum!!)
+        invalidateOptionsMenu()
+        hasMore()
+        refreshLayout.isRefreshing = false
+        refreshTitle()
+        preload()
+    }
+
+    @JvmOverloads
+    fun refresh(reset: Boolean = true) {
+        mAdapter.isSeeLz = seeLz
+        refreshLayout.isRefreshing = true
+        if (reset) {
+            recyclerView.scrollToPosition(0)
+            page = if (sort) totalPage else 1
+        }
+        TiebaApi.getInstance().threadContent(tid!!, page, seeLz, sort).enqueue(object : Callback<ThreadContentBean> {
+            override fun onFailure(call: Call<ThreadContentBean>, t: Throwable) {
+                if (t !is TiebaException) {
+                    Util.showNetworkErrorSnackbar(recyclerView) { refresh() }
+                } else {
+                    Toast.makeText(this@ThreadActivity, t.message, Toast.LENGTH_SHORT).show()
+                    refreshLayout.isRefreshing = false
+                }
+            }
+
+            override fun onResponse(call: Call<ThreadContentBean>, response: Response<ThreadContentBean>) {
+                refreshSuccess(response.body()!!)
+            }
+        })
+    }
+
+    override fun onStart() {
+        super.onStart()
+        val filter = IntentFilter()
+        filter.addAction(ACTION_REPLY_SUCCESS)
+        registerReceiver(replyReceiver, filter)
+    }
+
+    override fun onStop() {
+        super.onStop()
+        unregisterReceiver(replyReceiver)
+    }
+
+    fun refresh(pid: String) {
+        mAdapter.isSeeLz = seeLz
+        refreshLayout.isRefreshing = true
+        TiebaApi.getInstance().threadContent(tid!!, page, seeLz, sort).enqueue(object : Callback<ThreadContentBean> {
+            override fun onFailure(call: Call<ThreadContentBean>, t: Throwable) {
+                if (t !is TiebaException) {
+                    Util.showNetworkErrorSnackbar(recyclerView) { refresh() }
+                } else {
+                    Toast.makeText(this@ThreadActivity, t.message, Toast.LENGTH_SHORT).show()
+                    refreshLayout.isRefreshing = false
+                }
+            }
+
+            override fun onResponse(call: Call<ThreadContentBean>, response: Response<ThreadContentBean>) {
+                val threadContentBean = response.body()!!
+                refreshSuccess(threadContentBean)
+                val postListItemBean = mAdapter.allData.firstOrNull { it.id == pid }
+                if (postListItemBean != null) {
+                    if (!tip) when {
+                        FROM_COLLECT == from && maxPid != null -> {
+                            tip = true
+                            if (pid != maxPid) {
+                                Util.createSnackbar(recyclerView, getString(R.string.tip_collect, postListItemBean.floor), Snackbar.LENGTH_LONG)
+                                        .setAction(R.string.button_load_new) { refreshByPid(maxPid!!) }
+                                        .show()
+                            }
+                        }
+                        FROM_HISTORY == from && "1" != postListItemBean.floor -> {
+                            tip = true
+                            Util.createSnackbar(recyclerView, getString(R.string.tip_from_history, postListItemBean.floor), Snackbar.LENGTH_LONG)
+                                    .setAction(R.string.button_load_top) {
+                                        if (page <= 1) {
+                                            recyclerView.scrollToPosition(0)
+                                        } else {
+                                            refresh()
+                                        }
+                                    }
+                                    .show()
+                        }
+                    }
+                    if (pid != threadContentBean.postList?.get(0)?.id) {
+                        val position = mAdapter.allData.indexOf(postListItemBean)
+                        if (position >= 0) mLayoutManager.scrollToPositionWithOffset(position, 0)
+                    }
+                }
+            }
+        })
+    }
+
+    val url: String
+        get() = "https://tieba.baidu.com/p/$tid?see_lz=${if (seeLz) "1" else "0"}"
+
+    private fun refreshByPid(pid: String) {
+        mAdapter.isSeeLz = seeLz
+        refreshLayout.isRefreshing = true
+        TiebaApi.getInstance().threadContent(tid!!, pid, seeLz, sort).enqueue(object : Callback<ThreadContentBean> {
+            override fun onFailure(call: Call<ThreadContentBean>, t: Throwable) {
+                if (t is TiebaException) {
+                    Toast.makeText(this@ThreadActivity, t.message, Toast.LENGTH_SHORT).show()
+                    refreshLayout.isRefreshing = false
+                } else {
+                    Util.showNetworkErrorSnackbar(recyclerView) { refresh() }
+                }
+            }
+
+            override fun onResponse(call: Call<ThreadContentBean>, response: Response<ThreadContentBean>) {
+                val threadContentBean = response.body()!!
+                dataBean = threadContentBean
+                page = Integer.valueOf(threadContentBean.page?.currentPage!!)
+                totalPage = Integer.valueOf(threadContentBean.page.totalPage!!)
+                refresh(pid)
+            }
+
+        })
+    }
+
+    private fun loadFirstData() {
+        if (TextUtils.isEmpty(pid)) {
+            if (PreloadUtil.isPreloading(this)) {
+                refreshLayout.isRefreshing = true
+                val preloadId = PreloadUtil.getPreloadId(this)
+                PreLoader.listenData(preloadId) { threadContentBean: ThreadContentBean? ->
+                    if (threadContentBean == null) {
+                        refresh()
+                    } else {
+                        refreshSuccess(threadContentBean)
+                        PreLoader.destroy(preloadId)
+                    }
+                }
+            } else refresh()
+        } else {
+            refreshByPid(pid)
+        }
+    }
+
+    override fun setTitle(newTitle: String) {
+        toolbar.title = newTitle
+    }
+
+    private fun isLz(postListItemBean: PostListItemBean?): Boolean {
+        return dataBean!!.thread != null && dataBean!!.thread?.author != null && postListItemBean != null &&
+                TextUtils.equals(dataBean!!.thread?.author?.id, postListItemBean.authorId)
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        when (item.itemId) {
+            R.id.menu_report -> navigationHelper!!.navigationByData(NavigationHelper.ACTION_URL,
+                    getString(R.string.url_post_report,
+                            dataBean!!.forum?.id,
+                            dataBean!!.thread?.threadId,
+                            dataBean!!.thread?.postId))
+            R.id.menu_share -> TiebaUtil.shareText(this, url, if (dataBean == null) null else dataBean!!.thread?.title)
+            R.id.menu_jump_page -> {
+                val dialog = EditTextDialog(this)
+                        .setInputType(InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_NORMAL)
+                        .setHelperText(String.format(getString(R.string.tip_jump_page), page, totalPage))
+                        .setOnSubmitListener { page: String? ->
+                            val pn = Integer.valueOf(page!!)
+                            if (pn in 1..totalPage) {
+                                this.page = pn
+                                refresh(false)
+                            } else {
+                                Toast.makeText(this@ThreadActivity, R.string.toast_jump_page_too_big, Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                dialog.setTitle(R.string.title_jump_page)
+                dialog.show()
+            }
+            R.id.menu_see_lz -> {
+                seeLz = !seeLz
+                mAdapter.isSeeLz = seeLz
+                val postListItemBean = firstVisibleItem
+                if (postListItemBean == null || !isLz(postListItemBean)) {
+                    refresh()
+                } else {
+                    refreshByPid(postListItemBean.id!!)
+                }
+            }
+            R.id.menu_sort -> {
+                sort = !sort
+                refresh()
+            }
+            R.id.menu_pure_read -> if (!mAdapter.isImmersive) {
+                mAdapter.isImmersive = true
+                if (!seeLz) {
+                    seeLz = true
+                    mAdapter.isSeeLz = seeLz
+                    refresh()
+                }
+            } else {
+                mAdapter.isImmersive = false
+            }
+            R.id.menu_delete -> TiebaApi.getInstance().delThread(dataBean!!.forum?.id!!, dataBean!!.forum?.name!!, dataBean!!.thread?.id!!, dataBean!!.anti?.tbs!!).enqueue(object : Callback<CommonResponse> {
+                override fun onFailure(call: Call<CommonResponse>, t: Throwable) {
+                    Toast.makeText(this@ThreadActivity, getString(R.string.toast_delete_error, t.message), Toast.LENGTH_SHORT).show()
+                }
+
+                override fun onResponse(call: Call<CommonResponse>, response: Response<CommonResponse>) {
+                    Toast.makeText(this@ThreadActivity, R.string.toast_delete_thread_success, Toast.LENGTH_SHORT).show()
+                    finish()
+                }
+
+            })
+            R.id.menu_collect -> {
+                if (dataBean != null) {
+                    if (collect) {
+                        TiebaApi.getInstance().removeStore(tid!!, dataBean!!.anti?.tbs!!).enqueue(object : Callback<CommonResponse> {
+                            override fun onFailure(call: Call<CommonResponse>, t: Throwable) {
+                                Toast.makeText(this@ThreadActivity, getString(R.string.toast_collect_remove_error, t.message), Toast.LENGTH_SHORT).show()
+                            }
+
+                            override fun onResponse(call: Call<CommonResponse>, response: Response<CommonResponse>) {
+                                Toast.makeText(this@ThreadActivity, R.string.toast_collect_remove_success, Toast.LENGTH_SHORT).show()
+                                collect = !collect
+                                invalidateOptionsMenu()
+                            }
+
+                        })
+                    } else {
+                        collect(object : CommonAPICallback<CommonResponse> {
+                            override fun onSuccess(data: CommonResponse) {
+                                Toast.makeText(this@ThreadActivity, R.string.toast_collect_add_success, Toast.LENGTH_SHORT).show()
+                                collect = !collect
+                                invalidateOptionsMenu()
+                            }
+
+                            override fun onFailure(code: Int, error: String) {
+                                Toast.makeText(this@ThreadActivity, getString(R.string.toast_collect_add_error) + " " + error, Toast.LENGTH_SHORT).show()
+                            }
+                        }, false)
+                    }
+                }
+                return true
+            }
+        }
+        return super.onOptionsItemSelected(item)
+    }
+
+    private val firstVisibleItemPosition: Int
+        get() {
+            if (dataBean == null) return 0
+            var position = mLayoutManager.findFirstVisibleItemPosition() - 1
+            position = if (position < 0) 0 else if (position < mAdapter.dataCount) position else mAdapter.dataCount - 1
+            return position
+        }
+
+    private val firstVisibleItem: PostListItemBean?
+        get() {
+            if (dataBean == null) return null
+            var position = mLayoutManager.findFirstVisibleItemPosition() - 1
+            position = if (position < 0) 0 else if (position < mAdapter.dataCount) position else mAdapter.dataCount - 1
+            return mAdapter.getData(position)
+        }
+
+    private val lastVisibleItem: PostListItemBean?
+        get() {
+            if (dataBean == null) return null
+            var position = mLayoutManager.findLastVisibleItemPosition() - 1
+            position = if (position < 0) 0 else if (position < mAdapter.dataCount) position else mAdapter.dataCount - 1
+            return mAdapter.getData(position)
+        }
+
+    private fun collect(commonAPICallback: CommonAPICallback<CommonResponse>?, update: Boolean) {
+        if (dataBean == null || tid == null) return
+        val postListItemBean = firstVisibleItem ?: return
+        TiebaApi.getInstance().addStore(tid!!, postListItemBean.id!!, tbs = dataBean!!.anti?.tbs!!).enqueue(object : Callback<CommonResponse> {
+            override fun onFailure(call: Call<CommonResponse>, t: Throwable) {
+                if (t is TiebaException) {
+                    commonAPICallback?.onFailure(t.code, t.message)
+                } else {
+                    commonAPICallback?.onFailure(-1, t.message)
+                }
+            }
+
+            override fun onResponse(call: Call<CommonResponse>, response: Response<CommonResponse>) {
+                commonAPICallback?.onSuccess(response.body()!!)
+            }
+
+        })
+        if (!update) Util.miuiFav(this, getString(R.string.title_miui_fav, dataBean!!.thread?.title), url)
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.menu_tie_toolbar, menu)
+        return super.onCreateOptionsMenu(menu)
+    }
+
+    override fun onPrepareOptionsMenu(menu: Menu): Boolean {
+        val itemSeeLz = menu.findItem(R.id.menu_see_lz)
+        val itemSort = menu.findItem(R.id.menu_sort)
+        val itemCollect = menu.findItem(R.id.menu_collect)
+        val itemPure = menu.findItem(R.id.menu_pure_read)
+        val itemDelete = menu.findItem(R.id.menu_delete)
+        if (seeLz) {
+            itemSeeLz.setIcon(R.drawable.ic_round_account_circle)
+            itemSeeLz.setTitle(R.string.title_see_lz_on)
+            itemSeeLz.isChecked = true
+        } else {
+            itemSeeLz.setIcon(R.drawable.ic_outline_account_circle)
+            itemSeeLz.setTitle(R.string.title_see_lz)
+            itemSeeLz.isChecked = false
+        }
+        mAdapter.isSeeLz = seeLz
+        if (sort) {
+            itemSort.setTitle(R.string.title_sort_on)
+        } else {
+            itemSort.setTitle(R.string.title_sort)
+        }
+        if (collect) {
+            itemCollect.title = getString(R.string.title_collect_on)
+        } else {
+            itemCollect.title = getString(R.string.title_collect)
+        }
+        if (agree) {
+            agreeBtn.setImageResource(R.drawable.ic_twotone_like)
+            agreeBtn.imageTintList = ColorStateList.valueOf(ThemeUtils.getColorByAttr(this, R.attr.colorAccent))
+            agreeNumTextView.setTextColor(ColorStateList.valueOf(ThemeUtils.getColorByAttr(this, R.attr.colorAccent)))
+            agreeBtn.contentDescription = getString(R.string.title_agreed)
+        } else {
+            agreeBtn.setImageResource(R.drawable.ic_outline_like)
+            agreeBtn.imageTintList = ColorStateList.valueOf(ThemeUtil.getTextColor(this))
+            agreeNumTextView.setTextColor(ColorStateList.valueOf(ThemeUtil.getTextColor(this)))
+            agreeBtn.contentDescription = getString(R.string.title_agree)
+        }
+        if (mAdapter.isImmersive) {
+            itemPure.setTitle(R.string.title_pure_read_on)
+        } else {
+            itemPure.setTitle(R.string.title_pure_read)
+        }
+        itemDelete.isVisible = dataBean != null && TextUtils.equals(dataBean!!.user?.id, dataBean!!.thread?.author?.id)
+        return super.onPrepareOptionsMenu(menu)
+    }
+
+    override fun finish() {
+        if (dataBean != null && dataBean!!.thread != null) {
+            val postListItemBean = lastVisibleItem
+            var extras = ""
+            if (postListItemBean != null) {
+                extras = ThreadHistoryInfoBean()
+                        .setPid(postListItemBean.id)
+                        .setSeeLz(seeLz)
+                        .toString()
+            }
+            val history = History()
+                    .setData(tid)
+                    .setExtras(extras)
+                    .setTitle(dataBean!!.thread?.title)
+                    .setType(HistoryHelper.TYPE_THREAD)
+            if (dataBean!!.thread?.author != null) {
+                history.avatar = dataBean!!.thread?.author?.portrait
+                history.username = dataBean!!.thread?.author?.nameShow
+            }
+            historyHelper!!.writeHistory(history)
+        }
+        super.finish()
+    }
+
+    private fun exit(): Boolean {
+        if (collect) {
+            DialogUtil.build(this)
+                    .setMessage(R.string.message_update_store_floor)
+                    .setPositiveButton(R.string.button_yes) { dialog: DialogInterface, _ ->
+                        collect(object : CommonAPICallback<CommonResponse> {
+                            override fun onSuccess(data: CommonResponse) {
+                                Toast.makeText(this@ThreadActivity, R.string.toast_collect_update_success, Toast.LENGTH_SHORT).show()
+                                dialog.cancel()
+                                finish()
+                            }
+
+                            override fun onFailure(code: Int, error: String) {
+                                Toast.makeText(this@ThreadActivity, getString(R.string.toast_collect_update_error, error), Toast.LENGTH_SHORT).show()
+                            }
+                        }, true)
+                    }
+                    .setNegativeButton(R.string.button_no) { dialog: DialogInterface, _ ->
+                        dialog.cancel()
+                        finish()
+                    }
+                    .setNeutralButton(R.string.button_cancel, null)
+                    .create()
+                    .show()
+            return false
+        }
+        return true
+    }
+
+    override fun onBackPressed() {
+        if (Jzvd.backPress()) {
+            return
+        }
+        if (exit()) {
+            super.onBackPressed()
+        }
+    }
+
+    override fun onClick(v: View) {
+        when (v.id) {
+            R.id.thread_reply_bar -> if (dataBean != null && dataBean!!.thread != null) {
+                startActivity(Intent(this@ThreadActivity, ReplyActivity::class.java)
+                        .putExtra("data", ReplyInfoBean(dataBean!!.thread?.id,
+                                dataBean!!.forum?.id,
+                                dataBean!!.forum?.name,
+                                dataBean!!.anti?.tbs,
+                                dataBean!!.user?.nameShow).setPn(dataBean!!.page?.offset).toString()))
+            }
+            R.id.toolbar -> recyclerView.scrollToPosition(0)
+            R.id.thread_bottom_bar_agree -> if (dataBean != null && dataBean!!.thread != null) {
+                if (!agree) {
+                    agree = true
+                    agreeNum += 1
+                    invalidateAgreeStatus()
+                    TiebaApi.getInstance().agree(dataBean!!.thread?.threadInfo?.threadId!!, dataBean!!.thread?.threadInfo?.firstPostId!!).enqueue(object : Callback<AgreeBean> {
+                        override fun onFailure(call: Call<AgreeBean>, t: Throwable) {
+                            agree = false
+                            agreeNum -= 1
+                            Toast.makeText(this@ThreadActivity, getString(R.string.toast_agree_failed, t.message), Toast.LENGTH_SHORT).show()
+                            invalidateAgreeStatus()
+                        }
+
+                        override fun onResponse(call: Call<AgreeBean>, response: Response<AgreeBean>) {
+                            if (!agree) {
+                                agree = true
+                                invalidateAgreeStatus()
+                            }
+                        }
+                    })
+                } else {
+                    agree = false
+                    agreeNum -= 1
+                    invalidateAgreeStatus()
+                    TiebaApi.getInstance().disagree(dataBean!!.thread?.threadInfo?.threadId!!, dataBean!!.thread?.threadInfo?.firstPostId!!).enqueue(object : Callback<AgreeBean> {
+                        override fun onFailure(call: Call<AgreeBean>, t: Throwable) {
+                            agree = true
+                            agreeNum += 1
+                            invalidateAgreeStatus()
+                            Toast.makeText(this@ThreadActivity, getString(R.string.toast_unagree_failed, t.message), Toast.LENGTH_SHORT).show()
+                        }
+
+                        override fun onResponse(call: Call<AgreeBean>, response: Response<AgreeBean>) {
+                            if (agree) {
+                                agree = false
+                                invalidateAgreeStatus()
+                            }
+                        }
+                    })
+                }
+            }
+        }
+    }
+
+    fun invalidateAgreeStatus() {
+        val color = ThemeUtils.getColorByAttr(this, R.attr.colorAccent)
+        if (agreeBtn.imageTintList != null) {
+            val agreeBtnAnimator: ValueAnimator
+            val agreeNumAnimator: ValueAnimator
+            if (agree) {
+                agreeNumAnimator = colorAnim(agreeNumTextView, ThemeUtil.getTextColor(this@ThreadActivity), color)
+                agreeBtnAnimator = colorAnim(agreeBtn, ThemeUtil.getTextColor(this@ThreadActivity), color)
+                agreeNumAnimator.addListener(object : AnimatorListenerAdapter() {
+                    override fun onAnimationEnd(animation: Animator) {
+                        agreeNumTextView.setTextColor(color)
+                        super.onAnimationEnd(animation)
+                    }
+
+                    override fun onAnimationStart(animation: Animator) {
+                        agreeNumTextView.text = agreeNum.toString()
+                        super.onAnimationStart(animation)
+                    }
+                })
+                agreeBtnAnimator.addListener(object : AnimatorListenerAdapter() {
+                    override fun onAnimationEnd(animation: Animator) {
+                        agreeBtn.imageTintList = ColorStateList.valueOf(color)
+                        agreeBtn.contentDescription = getString(R.string.title_agreed)
+                        super.onAnimationEnd(animation)
+                    }
+
+                    override fun onAnimationStart(animation: Animator) {
+                        agreeBtn.setImageResource(R.drawable.ic_twotone_like)
+                        super.onAnimationStart(animation)
+                    }
+                })
+            } else {
+                agreeNumAnimator = colorAnim(agreeNumTextView, color, ThemeUtil.getTextColor(this@ThreadActivity))
+                agreeBtnAnimator = colorAnim(agreeBtn, color, ThemeUtil.getTextColor(this@ThreadActivity))
+                agreeNumAnimator.addListener(object : AnimatorListenerAdapter() {
+                    override fun onAnimationEnd(animation: Animator) {
+                        agreeNumTextView.setTextColor(ThemeUtil.getTextColor(this@ThreadActivity))
+                        super.onAnimationEnd(animation)
+                    }
+
+                    override fun onAnimationStart(animation: Animator) {
+                        agreeNumTextView.text = agreeNum.toString()
+                        super.onAnimationStart(animation)
+                    }
+                })
+                agreeBtnAnimator.addListener(object : AnimatorListenerAdapter() {
+                    override fun onAnimationEnd(animation: Animator) {
+                        agreeBtn.imageTintList = ColorStateList.valueOf(ThemeUtil.getTextColor(this@ThreadActivity))
+                        agreeBtn.contentDescription = getString(R.string.title_agree)
+                        super.onAnimationEnd(animation)
+                    }
+
+                    override fun onAnimationStart(animation: Animator) {
+                        agreeBtn.setImageResource(R.drawable.ic_outline_like)
+                        super.onAnimationStart(animation)
+                    }
+                })
+            }
+            agreeNumAnimator.setDuration(150).start()
+            agreeBtnAnimator.setDuration(150).start()
+        } else {
+            if (agree) {
+                agreeBtn.setImageResource(R.drawable.ic_twotone_like)
+                agreeBtn.imageTintList = ColorStateList.valueOf(color)
+                agreeNumTextView.setTextColor(ColorStateList.valueOf(color))
+                agreeBtn.contentDescription = getString(R.string.title_agreed)
+            } else {
+                agreeBtn.setImageResource(R.drawable.ic_outline_like)
+                agreeBtn.imageTintList = ColorStateList.valueOf(ThemeUtil.getTextColor(this))
+                agreeNumTextView.setTextColor(ColorStateList.valueOf(ThemeUtil.getTextColor(this)))
+                agreeBtn.contentDescription = getString(R.string.title_agree)
+            }
+        }
+    }
+
+    companion object {
+        const val ACTION_REPLY_SUCCESS = "com.huanchengfly.tieba.post.action.REPLY_SUCCESS"
+        const val FROM_COLLECT = "collect"
+        const val FROM_HISTORY = "history"
+        const val FROM_FORUM = "forum"
+    }
+}package com.huanchengfly.tieba.post.activities
+
+import android.annotation.SuppressLint
+import android.app.Activity
+import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Color
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.Drawable
+import android.net.Uri
+import android.os.Build
+import android.os.Bundle
+import android.view.Menu
+import android.view.MenuItem
+import android.view.MotionEvent
+import android.view.View
+import android.widget.Button
+import android.widget.SeekBar
+import android.widget.SeekBar.OnSeekBarChangeListener
+import android.widget.TextView
+import androidx.annotation.ColorInt
+import androidx.appcompat.widget.Toolbar
+import androidx.core.text.HtmlCompat
+import androidx.palette.graphics.Palette
+import androidx.recyclerview.widget.RecyclerView
+import butterknife.BindView
+import com.bumptech.glide.Glide
+import com.bumptech.glide.load.engine.DiskCacheStrategy
+import com.bumptech.glide.request.RequestOptions
+import com.bumptech.glide.request.target.CustomTarget
+import com.bumptech.glide.request.transition.Transition
+import com.gyf.immersionbar.ImmersionBar
+import com.huanchengfly.tieba.post.BaseApplication
+import com.huanchengfly.tieba.post.BaseApplication.Companion.translucentBackground
+import com.huanchengfly.tieba.post.R
+import com.huanchengfly.tieba.post.adapters.ThemeColorAdapter
+import com.huanchengfly.tieba.post.components.MyImageEngine
+import com.huanchengfly.tieba.post.components.MyLinearLayoutManager
+import com.huanchengfly.tieba.post.components.transformations.BlurTransformation
+import com.huanchengfly.tieba.post.interfaces.OnItemClickListener
+import com.huanchengfly.tieba.post.toastShort
+import com.huanchengfly.tieba.post.ui.theme.utils.ThemeUtils
+import com.huanchengfly.tieba.post.utils.ColorUtils
+import com.huanchengfly.tieba.post.utils.ImageUtil
+import com.huanchengfly.tieba.post.utils.PermissionUtil
+import com.huanchengfly.tieba.post.utils.ThemeUtil
+import com.jrummyapps.android.colorpicker.ColorPickerDialog
+import com.jrummyapps.android.colorpicker.ColorPickerDialogListener
+import com.yalantis.ucrop.UCrop
+import com.yanzhenjie.permission.Action
+import com.yanzhenjie.permission.runtime.Permission
+import com.zhihu.matisse.Matisse
+import com.zhihu.matisse.MimeType
+import java.io.File
+
+class TranslucentThemeActivity : BaseActivity(), View.OnClickListener, OnSeekBarChangeListener, ColorPickerDialogListener {
+    private var mUri: Uri? = null
+    private var alpha = 0
+    private var blur = 0
+    private var mPalette: Palette? = null
+
+    @BindView(R.id.select_color)
+    lateinit var mSelectColor: View
+    private var mAdapter: ThemeColorAdapter? = null
+
+    @BindView(R.id.progress)
+    lateinit var mProgress: View
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQUEST_CODE_CHOOSE && resultCode == Activity.RESULT_OK) {
+            val sourceUri = Matisse.obtainResult(data)[0]
+            Glide.with(this)
+                    .asDrawable()
+                    .load(sourceUri)
+                    .into(object : CustomTarget<Drawable>() {
+                        override fun onLoadCleared(placeholder: Drawable?) {}
+
+                        override fun onResourceReady(resource: Drawable, transition: Transition<in Drawable>?) {
+                            val bitmap = ImageUtil.drawableToBitmap(resource)
+                            val file = ImageUtil.bitmapToFile(bitmap, File(cacheDir, "origin_background.jpg"))
+                            val sourceFileUri = Uri.fromFile(file)
+                            val destUri = Uri.fromFile(File(cacheDir, "cropped_background.jpg"))
+                            val height = BaseApplication.ScreenInfo.EXACT_SCREEN_HEIGHT.toFloat()
+                            val width = BaseApplication.ScreenInfo.EXACT_SCREEN_WIDTH.toFloat()
+                            val uCropOptions = UCrop.Options()
+                            uCropOptions.setShowCropFrame(true)
+                            uCropOptions.setShowCropGrid(true)
+                            uCropOptions.setStatusBarColor(ColorUtils.getDarkerColor(ThemeUtils.getColorByAttr(this@TranslucentThemeActivity, R.attr.colorPrimary)))
+                            uCropOptions.setToolbarColor(ThemeUtils.getColorByAttr(this@TranslucentThemeActivity, R.attr.colorPrimary))
+                            uCropOptions.setToolbarWidgetColor(ThemeUtils.getColorByAttr(this@TranslucentThemeActivity, R.attr.colorTextOnPrimary))
+                            uCropOptions.setActiveWidgetColor(ThemeUtils.getColorByAttr(this@TranslucentThemeActivity, R.attr.colorAccent))
+                            uCropOptions.setActiveControlsWidgetColor(ThemeUtils.getColorByAttr(this@TranslucentThemeActivity, R.attr.colorAccent))
+                            uCropOptions.setLogoColor(ThemeUtils.getColorByAttr(this@TranslucentThemeActivity, R.attr.colorPrimary))
+                            uCropOptions.setCompressionFormat(Bitmap.CompressFormat.JPEG)
+                            UCrop.of(sourceFileUri, destUri)
+                                    .withAspectRatio(width / height, 1f)
+                                    .withOptions(uCropOptions)
+                                    .start(this@TranslucentThemeActivity)
+                        }
+                    })
+        } else if (resultCode == Activity.RESULT_OK && requestCode == UCrop.REQUEST_CROP) {
+            mUri = UCrop.getOutput(data!!)
+            invalidateOptionsMenu()
+            refreshBackground()
+        } else if (resultCode == UCrop.RESULT_ERROR) {
+            val cropError = UCrop.getError(data!!)
+            cropError!!.printStackTrace()
+        }
+    }
+
+    private fun refreshBackground() {
+        mProgress.visibility = View.VISIBLE
+        if (mUri == null) {
+            findViewById(R.id.background).setBackgroundColor(Color.BLACK)
+            mProgress.visibility = View.GONE
+            return
+        }
+        var bgOptions = RequestOptions.centerCropTransform()
+                .skipMemoryCache(true)
+                .diskCacheStrategy(DiskCacheStrategy.NONE)
+        if (blur > 0) {
+            bgOptions = bgOptions.transform(BlurTransformation(blur))
+        }
+        Glide.with(this)
+                .asDrawable()
+                .load(mUri)
+                .apply(bgOptions)
+                .into(object : CustomTarget<Drawable>() {
+                    override fun onResourceReady(resource: Drawable, transition: Transition<in Drawable>?) {
+                        resource.alpha = alpha
+                        val bitmap = ImageUtil.drawableToBitmap(resource)
+                        findViewById(R.id.background).backgroundTintList = null
+                        findViewById(R.id.background).background = BitmapDrawable(resources, bitmap)
+                        mPalette = Palette.from(bitmap).generate()
+                        mAdapter!!.setPalette(mPalette)
+                        mSelectColor.visibility = View.VISIBLE
+                        mProgress.visibility = View.GONE
+                    }
+
+                    override fun onLoadCleared(placeholder: Drawable?) {}
+                })
+    }
+
+    override fun refreshStatusBarColor() {
+        ImmersionBar.with(this)
+                .transparentBar()
+                .init()
+    }
+
+    override fun getLayoutId(): Int {
+        return R.layout.activity_translucent_theme
+    }
+
+    @SuppressLint("ApplySharedPref", "ClickableViewAccessibility")
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setSupportActionBar(findViewById(R.id.toolbar) as Toolbar)
+        supportActionBar!!.setDisplayHomeAsUpEnabled(true)
+        supportActionBar!!.setTitle(R.string.title_dialog_translucent_theme)
+        (findViewById(R.id.tip) as TextView).apply {
+            text = HtmlCompat.fromHtml(getString(R.string.tip_translucent_theme), HtmlCompat.FROM_HTML_MODE_LEGACY)
+        }
+        (findViewById(R.id.custom_color) as Button).apply {
+            setOnClickListener(this@TranslucentThemeActivity)
+        }
+        (findViewById(R.id.select_pic) as Button).apply {
+            setOnClickListener(this@TranslucentThemeActivity)
+        }
+        mAdapter = ThemeColorAdapter(this)
+        mAdapter!!.onItemClickListener = OnItemClickListener { _: View?, themeColor: Int, _: Int, _: Int ->
+            appPreferences.translucentPrimaryColor = toString(themeColor)
+            ThemeUtils.refreshUI(this)
+        }
+        (findViewById(R.id.select_color_recycler_view) as RecyclerView).apply {
+            layoutManager = MyLinearLayoutManager(this@TranslucentThemeActivity, MyLinearLayoutManager.HORIZONTAL, false)
+            adapter = mAdapter
+        }
+        alpha = appPreferences.translucentBackgroundAlpha
+        blur = appPreferences.translucentBackgroundBlur
+        (findViewById(R.id.alpha) as SeekBar).apply {
+            progress = this@TranslucentThemeActivity.alpha
+            setOnSeekBarChangeListener(this@TranslucentThemeActivity)
+        }
+        (findViewById(R.id.blur) as SeekBar).apply {
+            progress = this@TranslucentThemeActivity.blur
+            setOnSeekBarChangeListener(this@TranslucentThemeActivity)
+        }
+        mProgress.setOnTouchListener { _: View?, _: MotionEvent? -> true }
+        mProgress.visibility = View.GONE
+        findViewById(R.id.background).setBackgroundColor(Color.BLACK)
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.menu_translucent_theme_toolbar, menu)
+        return super.onCreateOptionsMenu(menu)
+    }
+
+    @SuppressLint("ApplySharedPref")
+    override fun onColorSelected(dialogId: Int, color: Int) {
+        appPreferences.translucentPrimaryColor = toString(color)
+        ThemeUtils.refreshUI(this)
+    }
+
+    override fun onDialogDismissed(dialogId: Int) {}
+
+    @SuppressLint("ApplySharedPref")
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        when (item.itemId) {
+            R.id.menu_finish -> {
+                appPreferences.apply {
+                    translucentBackgroundAlpha = alpha
+                    translucentBackgroundBlur = blur
+                }
+                savePic(object : SavePicCallback<File> {
+                    override fun onSuccess(t: File) {
+                        ThemeUtil.getSharedPreferences(this@TranslucentThemeActivity)
+                                .edit()
+                                .putString(ThemeUtil.SP_THEME, ThemeUtil.THEME_TRANSLUCENT)
+                                .putString(ThemeUtil.SP_OLD_THEME, ThemeUtil.THEME_TRANSLUCENT)
+                                .commit()
+                        toastShort(R.string.toast_save_pic_success)
+                        translucentBackground = null
+                        mProgress.visibility = View.GONE
+                        finish()
+                    }
+                })
+                return true
+            }
+            R.id.select_color -> return true
+        }
+        return super.onOptionsItemSelected(item)
+    }
+
+    private fun savePic(callback: SavePicCallback<File>) {
+        mProgress.visibility = View.VISIBLE
+        var bgOptions = RequestOptions.centerCropTransform()
+                .skipMemoryCache(true)
+                .diskCacheStrategy(DiskCacheStrategy.NONE)
+        if (blur > 0) {
+            bgOptions = bgOptions.transform(BlurTransformation(blur))
+        }
+        Glide.with(this)
+                .asDrawable()
+                .load(mUri)
+                .apply(bgOptions)
+                .into(object : CustomTarget<Drawable>() {
+                    override fun onResourceReady(resource: Drawable, transition: Transition<in Drawable>?) {
+                        resource.alpha = alpha
+                        val bitmap = ImageUtil.drawableToBitmap(resource)
+                        val file = ImageUtil.compressImage(bitmap, File(filesDir, "background.jpg"))
+                        mPalette = Palette.from(bitmap).generate()
+                        appPreferences.translucentThemeBackgroundPath = file.absolutePath
+                        ThemeUtils.refreshUI(this@TranslucentThemeActivity, this@TranslucentThemeActivity)
+                        callback.onSuccess(file)
+                    }
+
+                    override fun onLoadCleared(placeholder: Drawable?) {}
+                })
+    }
+
+    override fun onPrepareOptionsMenu(menu: Menu): Boolean {
+        val finishItem = menu.findItem(R.id.menu_finish)
+        finishItem.isEnabled = mUri != null
+        return super.onPrepareOptionsMenu(menu)
+    }
+
+    override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {}
+    override fun onStartTrackingTouch(seekBar: SeekBar) {}
+    override fun onStopTrackingTouch(seekBar: SeekBar) {
+        when (seekBar.id) {
+            R.id.alpha -> alpha = seekBar.progress
+            R.id.blur -> blur = seekBar.progress
+        }
+        refreshBackground()
+    }
+
+    override fun onClick(v: View) {
+        when (v.id) {
+            R.id.select_pic -> askPermission(Action {
+                Matisse.from(this)
+                        .choose(MimeType.ofImage())
+                        .theme(if (ThemeUtil.isNightMode(this)) R.style.Matisse_Dracula else R.style.Matisse_Zhihu)
+                        .imageEngine(MyImageEngine())
+                        .forResult(REQUEST_CODE_CHOOSE)
+            })
+            R.id.custom_color -> {
+                val primaryColorPicker = ColorPickerDialog.newBuilder()
+                        .setDialogTitle(R.string.title_color_picker_primary)
+                        .setDialogType(ColorPickerDialog.TYPE_CUSTOM)
+                        .setShowAlphaSlider(true)
+                        .setDialogId(0)
+                        .setAllowPresets(false)
+                        .setColor(ThemeUtils.getColorById(this, R.color.default_color_primary))
+                        .create()
+                primaryColorPicker.setColorPickerDialogListener(this)
+                primaryColorPicker.show(fragmentManager, "ColorPicker_TranslucentThemePrimaryColor")
+            }
+        }
+    }
+
+    private fun askPermission(granted: Action<List<String?>>) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            PermissionUtil.askPermission(this, granted, R.string.toast_no_permission_insert_photo,
+                    PermissionUtil.Permission(Permission.Group.STORAGE, getString(R.string.tip_permission_storage)))
+        } else {
+            PermissionUtil.askPermission(this, granted, R.string.toast_no_permission_insert_photo,
+                    PermissionUtil.Permission(Permission.READ_EXTERNAL_STORAGE, getString(R.string.tip_permission_storage)))
+        }
+    }
+
+    interface SavePicCallback<T> {
+        fun onSuccess(t: T)
+    }
+
+    companion object {
+        val TAG = TranslucentThemeActivity::class.java.simpleName
+        const val REQUEST_CODE_CHOOSE = 2
+        fun toString(alpha: Int, red: Int, green: Int, blue: Int): String {
+            val hr = Integer.toHexString(red)
+            val hg = Integer.toHexString(green)
+            val hb = Integer.toHexString(blue)
+            val ha = Integer.toHexString(alpha)
+            return "#" + fixHexString(ha) + fixHexString(hr) + fixHexString(hg) + fixHexString(hb)
+        }
+
+        private fun fixHexString(string: String): String {
+            var hexStr = string
+            if (hexStr.isEmpty()) {
+                hexStr = "00"
+            }
+            if (hexStr.length == 1) {
+                hexStr = "0$hexStr"
+            }
+            if (hexStr.length > 2) {
+                hexStr = hexStr.substring(0, 2)
+            }
+            return hexStr
+        }
+
+        fun toString(@ColorInt color: Int): String {
+            return toString(Color.alpha(color), Color.red(color), Color.green(color), Color.blue(color))
+        }
+    }
+}
